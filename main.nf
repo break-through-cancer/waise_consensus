@@ -19,222 +19,79 @@ include { TUMOUR_FILTER as GRIDSS_TUMOUR_FILTER } from './modules/tumour_filter.
 
 include { TUMOUR_CONSENSUS_VCF } from './modules/tumour_consensus.nf'
 include { TUMOUR_CONSENSUS_CALL } from './modules/tumour_consensus.nf'
-
-process MANTA {
-    
-    publishDir "${params.publishDir}", mode: 'copy'
-
-    container 'quay.io/biocontainers/manta:1.6.0--py27_0'
-
-    input:
-        tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
-        path reference_fasta
-        path reference_index
-
-    output:
-        path "manta/${id}/", emit: outdir
-        path "manta/${id}/results/variants/${id}*diploidSV.vcf", emit: vcf_n
-        tuple val(id), path("manta/${id}/results/variants/${id}*somaticSV.vcf"), emit: vcf_t
-
-    script:
-    def manta_outdir = "manta/${id}/"
-    """
-    configManta.py \
-    --tumorBam ${tumor_bam} \
-    --normalBam ${normal_bam} \
-    --reference ${params.reference_fasta} \
-    --runDir ${manta_outdir}
-
-    # Run manta
-    ${manta_outdir}/runWorkflow.py
-
-    # Unzip for jasmine compatibility
-    gunzip -c ${manta_outdir}/results/variants/somaticSV.vcf.gz > ${manta_outdir}/results/variants/${id}_somaticSV.vcf
-    gunzip -c ${manta_outdir}/results/variants/diploidSV.vcf.gz > ${manta_outdir}/results/variants/${id}_diploidSV.vcf
-    """
-
-}
-
-process LUMPY {
-
-    publishDir "${params.publishDir}", mode: 'copy'
-    
-    container 'quay.io/biocontainers/smoove:0.2.8--h9ee0642_1'
-
-    input:
-        tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
-
-    output:
-        path "lumpy/${id}/", emit: outdir
-        path "lumpy/${id}/*_normal.vcf", emit: vcf_n
-        tuple val(id), path("lumpy/${id}/*_tumor.vcf"), emit: vcf_t
-
-    script:
-    def lumpy_outdir = "lumpy/${id}/"
-
-    """
-    smoove call \
-        --name ${id} \
-        --outdir ${lumpy_outdir} \
-        -f ${params.reference_fasta} \
-        -processes 1 \
-        --removepr \
-        --support 3 \
-        ${normal_bam} \
-        ${tumor_bam}
-
-    # Get sample IDs from VCF header
-    echo "Getting sample IDs from joint VCF"
-    lumpy_file="${lumpy_outdir}/${id}-smoove.vcf"
-    gunzip -k \${lumpy_file}.gz
-    sids=`vcfutils.pl listsam \$lumpy_file`
-    normal_id=`echo \$sids | cut -f1 -d' '`
-    tumor_id=`echo \$sids | cut -f2 -d' '`
-
-    # Split VCF into tumor and normal
-    echo "Splitting joint output VCF"
-    vcfutils.pl subsam \$lumpy_file \$normal_id > ${lumpy_outdir}/${id}_normal.vcf
-    vcfutils.pl subsam \$lumpy_file \$tumor_id > ${lumpy_outdir}/${id}_tumor.vcf
-    """
-
-}
-
-process SVABA {
-
-    publishDir "${params.publishDir}", mode: 'copy'
-
-    container 'quay.io/biocontainers/svaba:1.1.0--h468198e_3'
-
-    input:
-        tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
-
-    output:
-        path "svaba/${id}/", emit: outdir
-        path "svaba/${id}/*svaba.germline.sv.vcf", emit: vcf_n
-        tuple val(id), path("svaba/${id}/*svaba.unfiltered.somatic.sv.vcf"), emit: vcf_t
-
-    script:
-    def svaba_outdir = "svaba/${id}/"
-    """
-    mkdir -p ${svaba_outdir}
-    tbam=\$(pwd)/${tumor_bam}
-    nbam=\$(pwd)/${normal_bam}
-
-    cd ${svaba_outdir}
-    svaba run \
-        -t \$tbam \
-        -n \$nbam \
-        -a ${id} \
-        --threads $params.threads \
-        --reference-genome $params.reference_fasta
-    """
-}
-
-process DELLY {
-
-    publishDir "${params.publishDir}", mode: 'copy'
-
-    container 'quay.io/biocontainers/delly:1.0.3--h358d541_4'
-
-    input:
-        tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
-
-    output:
-        val "${id}", emit: id
-        path "delly/${id}/", emit: outdir
-        path "delly/${id}/*_delly.bcf", emit: bcf
-
-    script:
-    def delly_outdir = "delly/${id}/"
-    
-    """
-    mkdir -p ${delly_outdir}
-    delly call \
-    -g $params.reference_fasta \
-    -o ${delly_outdir}/${id}_delly.bcf \
-    ${tumor_bam} \
-    ${normal_bam}
-    """
-}
-
-process DELLY_SPLIT {
-
-    publishDir "${params.publishDir}", mode: 'copy'
-
-    container 'quay.io/biocontainers/bcftools:1.19--h8b25389_0'
-
-    input:
-        val id
-        path delly_bcf
-
-    output:
-        path "delly/${id}/*_normal.vcf", emit: vcf_n
-        tuple val(id), path("delly/${id}/*_tumor.vcf"), emit: vcf_t
-
-    script:
-    def delly_outdir = "delly/${id}/"
-
-    """
-    mkdir -p ${delly_outdir} # For publishing
-    sids=`bcftools query -l ${delly_bcf}`
-    tumor_id=`echo \$sids | cut -f1 -d' '` # ID order is as given to DELLY_CALL
-    normal_id=`echo \$sids | cut -f2 -d' '`
-
-    # Split VCF into tumor and normal
-    echo "Splitting joint output VCF"
-    bcftools view -c1 -Ov -s \$normal_id -o ${delly_outdir}/${id}_normal.vcf ${delly_bcf}
-    bcftools view -c1 -Ov -s \$tumor_id -o ${delly_outdir}/${id}_tumor.vcf ${delly_bcf}
-    """
-}
-    
-process GRIDSS {
-
-    publishDir "${params.publishDir}", mode: 'copy'
-
-    container 'gridss/gridss:2.13.2'
-
-    input:
-        tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
-
-    output:
-        val "${id}", emit: id
-        path "gridsspl/${id}/", emit: outdir
-        path "gridsspl/${id}/${id}_normal.vcf", emit: vcf_n
-        tuple val(id), path("gridsspl/${id}/${id}_tumor.vcf"), emit: vcf_t
-
-    script:
-    def gridsspl_outdir = "gridsspl/${id}/"
-    def vcf_pre = "gridsspl/${id}/${id}"
-    def gridss_args = ""
-    """
-    # Run gridss
-    gridss \
-            -o ${gridsspl_outdir}/gridss.vcf \
-            -r $params.reference_fasta \
-            -b $params.gridss_blacklist \
-            -c $params.gridss_properties \
-            --threads $params.threads \
-            --jvmheap $params.jvmheap \
-            $gridss_args \
-            $normal_bam $tumor_bam
-
-    # Split BAMs
-    sids=`bcftools query -l ${gridsspl_outdir}/gridss.vcf`
-    normal_id=`echo \$sids | cut -f1 -d' '` # ID order is as given to GRIDSSPL
-    tumor_id=`echo \$sids | cut -f2 -d' '`
-
-    # Split VCF into tumor and normal
-    echo "Splitting joint output VCF"
-    bcftools view -c1 -Ov -s \$normal_id -o ${vcf_pre}_normal.vcf ${gridsspl_outdir}/gridss.vcf
-    bcftools view -c1 -Ov -s \$tumor_id -o ${vcf_pre}_tumor.vcf ${gridsspl_outdir}/gridss.vcf
-    """
-}
+include { PREP_REFERENCE; PREP_GRIDSS_ASSETS } from './modules/reference_prep.nf'
+include { MANTA } from './modules/manta.nf'
+include { LUMPY } from './modules/lumpy.nf'
+include { SVABA } from './modules/svaba.nf'
+include { DELLY; DELLY_SPLIT } from './modules/delly.nf'
+include { GRIDSS } from './modules/gridss.nf'
 
 workflow {
+    def requestedBuild = (params.genome_build ?: 'hg38').toString().toLowerCase()
+    def buildAliases = params.genome_build_aliases ?: [:]
+    def normalizedBuild = buildAliases.containsKey(requestedBuild) ? buildAliases[requestedBuild] : requestedBuild
+    def buildDefaults = (params.reference_defaults ?: [:])[normalizedBuild] ?: [:]
+    def usingDerivedBlacklist = params.gridss_blacklist == null && buildDefaults.gridss_blacklist
+
+    if (!['hg38', 'hg19', 'other'].contains(normalizedBuild)) {
+        error "Unsupported --genome_build '${params.genome_build}'. Use hg38, hg19, or other."
+    }
+
+    def csvValue = params.csv
+    def referenceFastaValue = params.reference_fasta ?: buildDefaults.reference_fasta
+    def referenceIndexValue = params.reference_index
+    def gridssBlacklistValue = params.gridss_blacklist ?: buildDefaults.gridss_blacklist
+    def gridssPropertiesValue = params.gridss_properties ?: params.default_gridss_properties
+    def optionalAsset = params.optional_asset_placeholder
+
+    if (!csvValue) {
+        error "Missing required parameter --csv. Provide a sample sheet or use -profile test."
+    }
+
+    if (!referenceFastaValue) {
+        error "Missing required reference FASTA. Set --genome_build hg38/hg19 or provide --reference_fasta."
+    }
+
+    if (referenceFastaValue.toString().endsWith('.gz') && referenceIndexValue) {
+        log.warn "Ignoring --reference_index for compressed FASTA inputs because the pipeline rebuilds the .fai after decompression."
+    }
+
+    if (!(csvValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(csvValue.toString()).exists()) {
+        error "Parameter --csv points to a missing local path: ${csvValue}"
+    }
+
+    if (!(referenceFastaValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(referenceFastaValue.toString()).exists()) {
+        error "Parameter --reference_fasta points to a missing local path: ${referenceFastaValue}"
+    }
+
+    if (referenceIndexValue && !(referenceIndexValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(referenceIndexValue.toString()).exists()) {
+        error "Parameter --reference_index points to a missing local path: ${referenceIndexValue}"
+    }
+
+    if (gridssBlacklistValue && !(gridssBlacklistValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssBlacklistValue.toString()).exists()) {
+        error "Parameter --gridss_blacklist points to a missing local path: ${gridssBlacklistValue}"
+    }
+
+    if (gridssPropertiesValue && !(gridssPropertiesValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssPropertiesValue.toString()).exists()) {
+        error "Parameter --gridss_properties points to a missing local path: ${gridssPropertiesValue}"
+    }
+
+    if (params.reference_fasta && usingDerivedBlacklist) {
+        log.warn "Using a build-derived GRIDSS blacklist with a custom reference FASTA. Override --gridss_blacklist if your custom FASTA does not match the default ${normalizedBuild} contigs."
+    }
+
+    def reference_fasta_source = Channel.value(file(referenceFastaValue))
+    def reference_index_source = Channel.value(file(referenceIndexValue ?: optionalAsset))
+    def gridss_blacklist_source = Channel.value(file(gridssBlacklistValue ?: optionalAsset))
+    def gridss_properties_source = Channel.value(file(gridssPropertiesValue))
+    def normalize_blacklist = Channel.value(usingDerivedBlacklist)
+
+    PREP_REFERENCE(reference_fasta_source, reference_index_source)
+    PREP_GRIDSS_ASSETS(gridss_blacklist_source, gridss_properties_source, normalize_blacklist)
 
     // Load inputs from csv
-    bam_channel = Channel
-            .fromPath(params.csv)
+    def bam_channel = Channel
+            .fromPath(csvValue)
             .splitCsv(header: true, sep: ',', strip: true)
             .map { row -> tuple(
                 row.id,
@@ -245,12 +102,12 @@ workflow {
                 ) } 
     
     // Run callers on BAM
-    MANTA(bam_channel, file(params.reference_fasta), file(params.reference_index))
-    LUMPY(bam_channel)
-    SVABA(bam_channel)
-    DELLY(bam_channel)
+    MANTA(bam_channel, PREP_REFERENCE.out.ref_dir)
+    LUMPY(bam_channel, PREP_REFERENCE.out.ref_dir)
+    SVABA(bam_channel, PREP_REFERENCE.out.ref_dir)
+    DELLY(bam_channel, PREP_REFERENCE.out.ref_dir)
     DELLY_SPLIT(DELLY.out.id, DELLY.out.bcf)
-    GRIDSS(bam_channel)
+    GRIDSS(bam_channel, PREP_REFERENCE.out.ref_dir, PREP_GRIDSS_ASSETS.out.blacklist, PREP_GRIDSS_ASSETS.out.properties)
 
     // Combine VCFs from normal outputs
     manta_normals = MANTA.out.vcf_n.collect()
