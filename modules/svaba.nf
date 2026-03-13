@@ -26,7 +26,7 @@ process SVABA {
         -t \$tbam \
         -n \$nbam \
         -a ${id} \
-        --threads $params.threads \
+        --threads ${task.cpus} \
         --reference-genome ${reference_fasta}
     """
 }

@@ -2,6 +2,8 @@
 process FILTER_TUMOUR {
     // Merge VCF files into a single VCF for downstream processing
 
+    label 'utility'
+
     publishDir "${params.publishDir}/filtered", mode: 'copy'
 
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_2'
@@ -50,6 +52,8 @@ process TUMOUR_CONSENSUS_VCF {
 process TUMOUR_CONSENSUS_CALL {
     // Merge VCF files into a single VCF for downstream processing
 
+    label 'utility'
+
     publishDir "${params.publishDir}/somatic", mode: 'copy'
 
     container 'quay.io/biocontainers/bcftools:1.21--h8b25389_0'
@@ -69,4 +73,3 @@ process TUMOUR_CONSENSUS_CALL {
     bcftools filter -i "INFO/SUPP > 4" tmp.vcf0 > ${id}_tumor_cons.vcf
     """
 }
-

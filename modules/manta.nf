@@ -16,6 +16,7 @@ process MANTA {
     script:
     def manta_outdir = "manta/${id}/"
     def reference_fasta = "${reference_dir}/reference.fa"
+    def manta_memory_gb = task.memory.toGiga().intValue()
     """
     configManta.py \
     --tumorBam ${tumor_bam} \
@@ -24,7 +25,7 @@ process MANTA {
     --runDir ${manta_outdir}
 
     # Run manta
-    ${manta_outdir}/runWorkflow.py
+    ${manta_outdir}/runWorkflow.py -m local -j ${task.cpus} -g ${manta_memory_gb}
 
     # Unzip for jasmine compatibility
     gunzip -c ${manta_outdir}/results/variants/somaticSV.vcf.gz > ${manta_outdir}/results/variants/${id}_somaticSV.vcf

@@ -5,6 +5,8 @@
 process MAKE {
     // Merge VCF files into a single VCF for downstream processing
 
+    label 'utility'
+
     publishDir "${params.publishDir}/panel", mode: 'copy'
 
     container 'quay.io/biocontainers/bcftools:1.21--h8b25389_0'

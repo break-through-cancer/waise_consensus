@@ -22,7 +22,7 @@ process LUMPY {
         --name ${id} \
         --outdir ${lumpy_outdir} \
         -f ${reference_fasta} \
-        -processes 1 \
+        -processes ${task.cpus} \
         --removepr \
         --support 3 \
         ${normal_bam} \

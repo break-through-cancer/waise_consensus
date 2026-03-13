@@ -20,6 +20,7 @@ process GRIDSS {
     def gridsspl_outdir = "gridsspl/${id}/"
     def vcf_pre = "gridsspl/${id}/${id}"
     def reference_fasta = "${reference_dir}/reference.fa"
+    def jvmheap = "${(task.memory.toGiga().intValue() * 3) / 4}g"
     """
     blacklist_arg=""
     if [[ -s ${gridss_blacklist} ]]; then
@@ -35,8 +36,8 @@ process GRIDSS {
     gridss \
             -o ${gridsspl_outdir}/gridss.vcf \
             -r ${reference_fasta} \
-            --threads $params.threads \
-            --jvmheap $params.jvmheap \
+            --threads ${task.cpus} \
+            --jvmheap ${jvmheap} \
             \$blacklist_arg \
             \$properties_arg \
             $normal_bam $tumor_bam

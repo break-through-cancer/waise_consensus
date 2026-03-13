@@ -34,6 +34,8 @@ process PREP_REFERENCE {
 
 process PREP_GRIDSS_ASSETS {
 
+    label 'utility'
+
     container 'gridss/gridss:2.13.2'
 
     input:

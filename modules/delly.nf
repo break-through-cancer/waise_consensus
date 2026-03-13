@@ -29,6 +29,8 @@ process DELLY {
 
 process DELLY_SPLIT {
 
+    label 'utility'
+
     publishDir "${params.publishDir}", mode: 'copy'
 
     container 'quay.io/biocontainers/bcftools:1.19--h8b25389_0'

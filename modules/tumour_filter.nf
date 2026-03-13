@@ -2,6 +2,8 @@
 process TUMOUR_FILTER {
     // Merge VCF files into a single VCF for downstream processing
 
+    label 'utility'
+
     publishDir "${params.publishDir}/filtered", mode: 'copy'
 
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_2'
