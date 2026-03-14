@@ -15,11 +15,11 @@ process SVABA {
 
     script:
     def svaba_outdir = "svaba/${id}/"
-    def reference_fasta = "${reference_dir}/reference.fa"
     """
     mkdir -p ${svaba_outdir}
     tbam=\$(pwd)/${tumor_bam}
     nbam=\$(pwd)/${normal_bam}
+    ref=\$(pwd)/${reference_dir}/reference.fa
 
     cd ${svaba_outdir}
     svaba run \
@@ -27,6 +27,6 @@ process SVABA {
         -n \$nbam \
         -a ${id} \
         --threads ${task.cpus} \
-        --reference-genome ${reference_fasta}
+        --reference-genome \$ref
     """
 }
