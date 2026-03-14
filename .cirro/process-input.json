@@ -1,0 +1,7 @@
+{
+  "publishDir": "$.params.dataset.s3|/data/",
+  "genome_build": "$.dataset.params.genome_build",
+  "reference_fasta": "$.dataset.params.reference_fasta",
+  "gridss_blacklist": "$.dataset.params.gridss_blacklist",
+  "gridss_properties": "$.dataset.params.gridss_properties"
+}

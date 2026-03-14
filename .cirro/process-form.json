@@ -1,0 +1,46 @@
+{
+  "form": {
+    "type": "object",
+    "properties": {
+      "genome_build": {
+        "title": "Genome Build",
+        "description": "Genome Build",
+        "type": "string",
+        "default": "hg38",
+        "enum": [
+          "hg38",
+          "hg19",
+          "other"
+        ]
+      },
+      "reference_fasta": {
+        "title": "Reference Fasta",
+        "description": "Required if genome_build == 'other', defaults available for hg38 and hg19",
+        "type": "string",
+        "multiple": false,
+        "pathType": "reference",
+        "file": "**/genome_fasta_gatk/**/genome.fasta"
+      },
+      "gridss_blacklist": {
+        "title": "Blacklist Bed File",
+        "description": "Required if genome_build == 'other', defaults available for hg38 and hg19",
+        "type": "string",
+        "multiple": false,
+        "pathType": "reference",
+        "file": "**/genome_bed/**/regions.bed"
+      },
+      "gridss_properties": {
+        "title": "GRIDSS Property Files",
+        "description": "GRIDSS property files from their github. Can supply custom properties if desired",
+        "type": "string",
+        "multiple": false,
+        "pathType": "reference",
+        "file": "**/*"
+      }
+    },
+    "required": [
+      "genome_build"
+    ]
+  },
+  "ui": {}
+}
