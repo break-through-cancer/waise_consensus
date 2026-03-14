@@ -57,7 +57,7 @@ process PREP_GRIDSS_ASSETS {
     container 'gridss/gridss:2.13.2'
 
     input:
-        path gridss_properties_source
+        path gridss_properties_source, name: 'gridss.properties.input'
 
     output:
         path 'gridss_blacklist.bed', emit: blacklist
@@ -66,7 +66,7 @@ process PREP_GRIDSS_ASSETS {
     script:
     """
     : > gridss_blacklist.bed
-    cp ${gridss_properties_source} gridss.properties
+    cp gridss.properties.input gridss.properties
     """
 }
 
@@ -78,7 +78,7 @@ process PREP_GRIDSS_ASSETS_WITH_BLACKLIST {
 
     input:
         path gridss_blacklist_source
-        path gridss_properties_source
+        path gridss_properties_source, name: 'gridss.properties.input'
         val normalize_default_blacklist
 
     output:
@@ -99,6 +99,6 @@ process PREP_GRIDSS_ASSETS_WITH_BLACKLIST {
         mv raw_gridss_blacklist.bed gridss_blacklist.bed
     fi
 
-    cp ${gridss_properties_source} gridss.properties
+    cp gridss.properties.input gridss.properties
     """
 }
