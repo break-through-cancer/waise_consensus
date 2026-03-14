@@ -19,7 +19,10 @@ process SVABA {
     mkdir -p ${svaba_outdir}
     tbam=\$(pwd)/${tumor_bam}
     nbam=\$(pwd)/${normal_bam}
-    ref=\$(pwd)/${reference_dir}/reference.fa
+
+    # Explicitly localize the reference FASTA and all BWA index files
+    cp ${reference_dir}/reference.fa* ./
+    ref=\$(pwd)/reference.fa
 
     cd ${svaba_outdir}
     svaba run \
