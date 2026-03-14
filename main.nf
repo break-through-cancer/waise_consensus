@@ -19,7 +19,7 @@ include { TUMOUR_FILTER as GRIDSS_TUMOUR_FILTER } from './modules/tumour_filter.
 
 include { TUMOUR_CONSENSUS_VCF } from './modules/tumour_consensus.nf'
 include { TUMOUR_CONSENSUS_CALL } from './modules/tumour_consensus.nf'
-include { PREP_REFERENCE; PREP_GRIDSS_ASSETS } from './modules/reference_prep.nf'
+include { PREP_REFERENCE; PREP_REFERENCE_WITH_INDEX; PREP_GRIDSS_ASSETS; PREP_GRIDSS_ASSETS_WITH_BLACKLIST } from './modules/reference_prep.nf'
 include { MANTA } from './modules/manta.nf'
 include { LUMPY } from './modules/lumpy.nf'
 include { SVABA } from './modules/svaba.nf'
@@ -31,7 +31,7 @@ workflow {
     def buildAliases = params.genome_build_aliases ?: [:]
     def normalizedBuild = buildAliases.containsKey(requestedBuild) ? buildAliases[requestedBuild] : requestedBuild
     def buildDefaults = (params.reference_defaults ?: [:])[normalizedBuild] ?: [:]
-    def usingDerivedBlacklist = params.gridss_blacklist == null && buildDefaults.gridss_blacklist
+    def usingDerivedBlacklist = params.gridss_blacklist == null && buildDefaults.gridss_blacklist != null
 
     if (!['hg38', 'hg19', 'other'].contains(normalizedBuild)) {
         error "Unsupported --genome_build '${params.genome_build}'. Use hg38, hg19, or other."
@@ -42,7 +42,6 @@ workflow {
     def referenceIndexValue = params.reference_index
     def gridssBlacklistValue = params.gridss_blacklist ?: buildDefaults.gridss_blacklist
     def gridssPropertiesValue = params.gridss_properties ?: params.default_gridss_properties
-    def optionalAsset = params.optional_asset_placeholder
 
     if (!csvValue) {
         error "Missing required parameter --csv. Provide a sample sheet or use -profile test."
@@ -81,13 +80,31 @@ workflow {
     }
 
     def reference_fasta_source = Channel.value(file(referenceFastaValue))
-    def reference_index_source = Channel.value(file(referenceIndexValue ?: optionalAsset))
-    def gridss_blacklist_source = Channel.value(file(gridssBlacklistValue ?: optionalAsset))
     def gridss_properties_source = Channel.value(file(gridssPropertiesValue))
-    def normalize_blacklist = Channel.value(usingDerivedBlacklist)
+    def prepared_reference
+    def prepared_gridss_blacklist
+    def prepared_gridss_properties
 
-    PREP_REFERENCE(reference_fasta_source, reference_index_source)
-    PREP_GRIDSS_ASSETS(gridss_blacklist_source, gridss_properties_source, normalize_blacklist)
+    if (referenceIndexValue) {
+        def reference_index_source = Channel.value(file(referenceIndexValue))
+        PREP_REFERENCE_WITH_INDEX(reference_fasta_source, reference_index_source)
+        prepared_reference = PREP_REFERENCE_WITH_INDEX.out.ref_dir
+    } else {
+        PREP_REFERENCE(reference_fasta_source)
+        prepared_reference = PREP_REFERENCE.out.ref_dir
+    }
+
+    if (gridssBlacklistValue) {
+        def gridss_blacklist_source = Channel.value(file(gridssBlacklistValue))
+        def normalize_blacklist = Channel.value(usingDerivedBlacklist)
+        PREP_GRIDSS_ASSETS_WITH_BLACKLIST(gridss_blacklist_source, gridss_properties_source, normalize_blacklist)
+        prepared_gridss_blacklist = PREP_GRIDSS_ASSETS_WITH_BLACKLIST.out.blacklist
+        prepared_gridss_properties = PREP_GRIDSS_ASSETS_WITH_BLACKLIST.out.properties
+    } else {
+        PREP_GRIDSS_ASSETS(gridss_properties_source)
+        prepared_gridss_blacklist = PREP_GRIDSS_ASSETS.out.blacklist
+        prepared_gridss_properties = PREP_GRIDSS_ASSETS.out.properties
+    }
 
     // Load inputs from csv
     def bam_channel = Channel
@@ -102,12 +119,12 @@ workflow {
                 ) } 
     
     // Run callers on BAM
-    MANTA(bam_channel, PREP_REFERENCE.out.ref_dir)
-    LUMPY(bam_channel, PREP_REFERENCE.out.ref_dir)
-    SVABA(bam_channel, PREP_REFERENCE.out.ref_dir)
-    DELLY(bam_channel, PREP_REFERENCE.out.ref_dir)
+    MANTA(bam_channel, prepared_reference)
+    LUMPY(bam_channel, prepared_reference)
+    SVABA(bam_channel, prepared_reference)
+    DELLY(bam_channel, prepared_reference)
     DELLY_SPLIT(DELLY.out.id, DELLY.out.bcf)
-    GRIDSS(bam_channel, PREP_REFERENCE.out.ref_dir, PREP_GRIDSS_ASSETS.out.blacklist, PREP_GRIDSS_ASSETS.out.properties)
+    GRIDSS(bam_channel, prepared_reference, prepared_gridss_blacklist, prepared_gridss_properties)
 
     // Combine VCFs from normal outputs
     manta_normals = MANTA.out.vcf_n.collect()

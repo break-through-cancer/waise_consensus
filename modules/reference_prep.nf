@@ -4,13 +4,11 @@ process PREP_REFERENCE {
 
     input:
         path reference_fasta_source
-        path reference_index_source
 
     output:
         path 'reference', emit: ref_dir
 
     script:
-    def placeholderName = 'optional_asset.placeholder'
     """
     mkdir -p reference
 
@@ -20,11 +18,31 @@ process PREP_REFERENCE {
         cp ${reference_fasta_source} reference/reference.fa
     fi
 
+    samtools faidx reference/reference.fa
+    bwa index reference/reference.fa
+    """
+}
+
+process PREP_REFERENCE_WITH_INDEX {
+
+    container 'gridss/gridss:2.13.2'
+
+    input:
+        path reference_fasta_source
+        path reference_index_source
+
+    output:
+        path 'reference', emit: ref_dir
+
+    script:
+    """
+    mkdir -p reference
+
     if [[ "${reference_fasta_source}" == *.gz ]]; then
-        samtools faidx reference/reference.fa
-    elif [[ "\$(basename ${reference_index_source})" == "${placeholderName}" ]]; then
+        gzip -dc ${reference_fasta_source} > reference/reference.fa
         samtools faidx reference/reference.fa
     else
+        cp ${reference_fasta_source} reference/reference.fa
         cp ${reference_index_source} reference/reference.fa.fai
     fi
 
@@ -33,6 +51,26 @@ process PREP_REFERENCE {
 }
 
 process PREP_GRIDSS_ASSETS {
+
+    label 'utility'
+
+    container 'gridss/gridss:2.13.2'
+
+    input:
+        path gridss_properties_source
+
+    output:
+        path 'gridss_blacklist.bed', emit: blacklist
+        path 'gridss.properties', emit: properties
+
+    script:
+    """
+    : > gridss_blacklist.bed
+    cp ${gridss_properties_source} gridss.properties
+    """
+}
+
+process PREP_GRIDSS_ASSETS_WITH_BLACKLIST {
 
     label 'utility'
 
@@ -48,11 +86,8 @@ process PREP_GRIDSS_ASSETS {
         path 'gridss.properties', emit: properties
 
     script:
-    def placeholderName = 'optional_asset.placeholder'
     """
-    if [[ "\$(basename ${gridss_blacklist_source})" == "${placeholderName}" ]]; then
-        : > raw_gridss_blacklist.bed
-    elif [[ "${gridss_blacklist_source}" == *.gz ]]; then
+    if [[ "${gridss_blacklist_source}" == *.gz ]]; then
         gzip -dc ${gridss_blacklist_source} > raw_gridss_blacklist.bed
     else
         cp ${gridss_blacklist_source} raw_gridss_blacklist.bed
