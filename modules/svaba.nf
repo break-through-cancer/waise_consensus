@@ -20,13 +20,15 @@ process SVABA {
     mkdir -p ${svaba_outdir}
     tbam=\$(pwd)/${tumor_bam}
     nbam=\$(pwd)/${normal_bam}
+    # Resolve staged inputs before changing directories.
+    reference_fasta_abs="\$(pwd)/${reference_fasta}"
 
     cd ${svaba_outdir}
     svaba run \
-        -t \$tbam \
-        -n \$nbam \
+        -t "\$tbam" \
+        -n "\$nbam" \
         -a ${id} \
         --threads ${task.cpus} \
-        --reference-genome ${reference_fasta}
+        --reference-genome "\$reference_fasta_abs"
     """
 }

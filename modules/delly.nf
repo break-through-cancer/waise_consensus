@@ -19,11 +19,12 @@ process DELLY {
     
     """
     mkdir -p ${delly_outdir}
+    reference_fasta_abs="\$(pwd)/${reference_fasta}"
     delly call \
-    -g ${reference_fasta} \
+    -g "\$reference_fasta_abs" \
     -o ${delly_outdir}/${id}_delly.bcf \
-    ${tumor_bam} \
-    ${normal_bam}
+    "${tumor_bam}" \
+    "${normal_bam}"
     """
 }
 

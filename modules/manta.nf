@@ -18,10 +18,11 @@ process MANTA {
     def reference_fasta = "${reference_dir}/reference.fa"
     def manta_memory_gb = task.memory.toGiga().intValue()
     """
+    reference_fasta_abs="\$(pwd)/${reference_fasta}"
     configManta.py \
-    --tumorBam ${tumor_bam} \
-    --normalBam ${normal_bam} \
-    --reference ${reference_fasta} \
+    --tumorBam "${tumor_bam}" \
+    --normalBam "${normal_bam}" \
+    --reference "\$reference_fasta_abs" \
     --runDir ${manta_outdir}
 
     # Run manta

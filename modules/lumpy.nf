@@ -18,15 +18,16 @@ process LUMPY {
     def reference_fasta = "${reference_dir}/reference.fa"
 
     """
+    reference_fasta_abs="\$(pwd)/${reference_fasta}"
     smoove call \
         --name ${id} \
         --outdir ${lumpy_outdir} \
-        -f ${reference_fasta} \
+        -f "\$reference_fasta_abs" \
         -processes ${task.cpus} \
         --removepr \
         --support 3 \
-        ${normal_bam} \
-        ${tumor_bam}
+        "${normal_bam}" \
+        "${tumor_bam}"
 
     # Get sample IDs from VCF header
     echo "Getting sample IDs from joint VCF"

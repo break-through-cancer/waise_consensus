@@ -1,3 +1,4 @@
+// Both prep paths normalize the staged FASTA name to reference/reference.fa.
 process PREP_REFERENCE {
 
     container 'gridss/gridss:2.13.2'

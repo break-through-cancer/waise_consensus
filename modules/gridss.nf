@@ -23,6 +23,7 @@ process GRIDSS {
     def jvmheap = "${(task.memory.toGiga().intValue() * 3) / 4}g"
     """
     blacklist_arg=""
+    reference_fasta_abs="\$(pwd)/${reference_fasta}"
     if [[ -s ${gridss_blacklist} ]]; then
         blacklist_arg="-b ${gridss_blacklist}"
     fi
@@ -35,12 +36,12 @@ process GRIDSS {
     # Run gridss
     gridss \
             -o ${gridsspl_outdir}/gridss.vcf \
-            -r ${reference_fasta} \
+            -r "\$reference_fasta_abs" \
             --threads ${task.cpus} \
             --jvmheap ${jvmheap} \
             \$blacklist_arg \
             \$properties_arg \
-            $normal_bam $tumor_bam
+            "${normal_bam}" "${tumor_bam}"
 
     # Split BAMs
     sids=`bcftools query -l ${gridsspl_outdir}/gridss.vcf`
