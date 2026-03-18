@@ -31,6 +31,10 @@ nasa3,t3.bam,t1.bam.bai,n3.bam,n1.bam.bai
 > [!NOTE]
 > BAM index files are required for Nextflow to include them in the working directory.
 
+## Tumour Filter Safeguards
+
+The tumour-panel subtraction step now drops malformed VCF records whose primary `POS` is outside the allowed contig bounds before running `bedtools`. This covers both `POS <= 0` and records whose `POS` exceeds a declared `##contig` length, preventing caller-specific edge cases from aborting tumour filtering.
+
 ## Reference Selection
 
 The pipeline no longer assumes reference assets are stored under `projectDir`.
