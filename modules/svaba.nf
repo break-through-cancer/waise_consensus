@@ -1,5 +1,7 @@
 process SVABA {
 
+    tag { "${task.process}_${task.attempt}_${id}" }
+
     publishDir "${params.publishDir}", mode: 'copy'
 
     container 'quay.io/biocontainers/svaba:1.1.0--h468198e_3'

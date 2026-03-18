@@ -1,5 +1,7 @@
 process GRIDSS {
 
+    tag { "${task.process}_${task.attempt}_${id}" }
+
     publishDir "${params.publishDir}", mode: 'copy'
 
     container 'gridss/gridss:2.13.2'

@@ -1,5 +1,7 @@
 process LUMPY {
 
+    tag { "${task.process}_${task.attempt}_${id}" }
+
     publishDir "${params.publishDir}", mode: 'copy'
     
     container 'quay.io/biocontainers/smoove:0.2.8--h9ee0642_1'

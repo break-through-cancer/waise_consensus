@@ -1,5 +1,7 @@
 process DELLY {
 
+    tag { "${task.process}_${task.attempt}_${id}" }
+
     publishDir "${params.publishDir}", mode: 'copy'
 
     container 'quay.io/biocontainers/delly:1.0.3--h358d541_4'
@@ -29,6 +31,8 @@ process DELLY {
 }
 
 process DELLY_SPLIT {
+
+    tag { "${task.process}_${task.attempt}_${id}" }
 
     label 'utility'
 
