@@ -41,7 +41,7 @@ process TUMOUR_FILTER {
             payload = line
             sub(/^##contig=<ID=/, "", payload)
             split(payload, parts, /,length=|>/)
-            if (parts[1] != "" && parts[2] ~ /^[0-9]+$/) {
+            if (parts[1] != "" && parts[2] ~ /^[0-9]+\$/) {
                 contig_length[parts[1]] = parts[2] + 0
             }
         }
