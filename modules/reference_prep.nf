@@ -116,7 +116,7 @@ process PREP_GRIDSS_ASSETS_WITH_BLACKLIST {
             next
         }
         function is_header() {
-            return \$0 ~ /^[[:space:]]*$/ || \$0 ~ /^#/ || \$0 ~ /^track([[:space:]]|$)/ || \$0 ~ /^browser([[:space:]]|$)/
+            return \$0 ~ /^[[:space:]]*\$/ || \$0 ~ /^#/ || \$0 ~ /^track([[:space:]]|\$)/ || \$0 ~ /^browser([[:space:]]|\$)/
         }
         function map_contig(contig, core, candidate) {
             core = contig
