@@ -76,7 +76,7 @@ workflow {
     }
 
     if (params.reference_fasta && usingDerivedBlacklist) {
-        log.warn "Using a build-derived GRIDSS blacklist with a custom reference FASTA. Override --gridss_blacklist if your custom FASTA does not match the default ${normalizedBuild} contigs."
+        log.warn "Using a build-derived GRIDSS blacklist with a custom reference FASTA. The workflow will remap simple contig aliases against the staged reference, but you should still override --gridss_blacklist if your FASTA uses a non-canonical naming scheme."
     }
 
     def reference_fasta_source = Channel.value(file(referenceFastaValue))
@@ -96,8 +96,7 @@ workflow {
 
     if (gridssBlacklistValue) {
         def gridss_blacklist_source = Channel.value(file(gridssBlacklistValue))
-        def normalize_blacklist = Channel.value(usingDerivedBlacklist)
-        PREP_GRIDSS_ASSETS_WITH_BLACKLIST(gridss_blacklist_source, gridss_properties_source, normalize_blacklist)
+        PREP_GRIDSS_ASSETS_WITH_BLACKLIST(prepared_reference, gridss_blacklist_source, gridss_properties_source)
         prepared_gridss_blacklist = PREP_GRIDSS_ASSETS_WITH_BLACKLIST.out.blacklist
         prepared_gridss_properties = PREP_GRIDSS_ASSETS_WITH_BLACKLIST.out.properties
     } else {
