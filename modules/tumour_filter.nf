@@ -17,20 +17,21 @@ process TUMOUR_FILTER {
         tuple val(id), path("${id}_${tool}_filtered.vcf"), emit: filtered_vcf
 
     script:
-    '''
+    """
     set -euo pipefail
 
     tumour_valid_vcf="tumour_primary_valid.vcf"
     panel_valid_vcf="panel_primary_valid.vcf"
+    filtered_vcf="${id}_${tool}_filtered.vcf"
 
     sanitize_vcf() {
-        local input_vcf="$1"
-        local output_vcf="$2"
+        local input_vcf="\$1"
+        local output_vcf="\$2"
 
-        : > "${output_vcf}"
+        : > "\${output_vcf}"
 
         # Keep the VCF header, but drop records whose primary POS falls outside the contig bounds.
-        VALID_VCF="${output_vcf}" awk '
+        VALID_VCF="\${output_vcf}" awk '
         BEGIN {
             FS = OFS = "\\t"
             valid_vcf = ENVIRON["VALID_VCF"]
@@ -50,7 +51,7 @@ process TUMOUR_FILTER {
         }
 
         /^##contig=<ID=/ {
-            store_contig_length($0)
+            store_contig_length(\$0)
             print > valid_vcf
             next
         }
@@ -61,26 +62,26 @@ process TUMOUR_FILTER {
         }
 
         {
-            pos = $2 + 0
+            pos = \$2 + 0
 
             # Drop invalid primary positions before bedtools sees the VCF body.
-            if (!primary_invalid($1, pos)) {
+            if (!primary_invalid(\$1, pos)) {
                 print > valid_vcf
             }
         }
-        ' "${input_vcf}"
+        ' "\${input_vcf}"
     }
 
-    sanitize_vcf !{vcf_file} "${tumour_valid_vcf}"
-    sanitize_vcf !{normal_panel} "${panel_valid_vcf}"
+    sanitize_vcf "${vcf_file}" "\${tumour_valid_vcf}"
+    sanitize_vcf "${normal_panel}" "\${panel_valid_vcf}"
 
     # Rebuild the final VCF explicitly because bedtools subtract does not document header preservation.
-    grep '^#' "${tumour_valid_vcf}" > !{id}_!{tool}_filtered.vcf
+    grep '^#' "\${tumour_valid_vcf}" > "\${filtered_vcf}"
 
-    if grep -qv '^#' "${panel_valid_vcf}"; then
-        bedtools subtract -a "${tumour_valid_vcf}" -b "${panel_valid_vcf}" | awk '!/^#/' >> !{id}_!{tool}_filtered.vcf
+    if grep -qv '^#' "\${panel_valid_vcf}"; then
+        bedtools subtract -a "\${tumour_valid_vcf}" -b "\${panel_valid_vcf}" | awk '!/^#/' >> "\${filtered_vcf}"
     else
-        awk '!/^#/' "${tumour_valid_vcf}" >> !{id}_!{tool}_filtered.vcf
+        awk '!/^#/' "\${tumour_valid_vcf}" >> "\${filtered_vcf}"
     fi
-    '''
+    """
 }
