@@ -39,20 +39,33 @@ The tumour-panel subtraction step now drops malformed VCF records whose primary 
 
 The pipeline no longer assumes reference assets are stored under `projectDir`.
 
-For the common human builds, set `--genome_build` and let the workflow derive the canonical reference FASTA, GRIDSS blacklist, and GRIDSS properties:
+For the common human builds, set `--genome_build` and let the workflow derive the canonical reference FASTA, GRIDSS blacklist, GRIDSS properties, and the HMF GRIDSS panel-of-normals bundle used by `gridss_somatic_filter`:
 
 ```bash
 nextflow run main.nf -profile singularity --csv samplesheet.csv --genome_build hg38
 nextflow run main.nf -profile singularity --csv samplesheet.csv --genome_build hg19
 ```
 
-If you use a non-default or nonhuman reference, set `--genome_build other` and provide the FASTA explicitly. The workflow will build the `.fai` and BWA index files if they are missing:
+Automatic GRIDSS PoN bundle extraction is only enabled for the exact `--genome_build hg38` and `--genome_build hg19` values.
+
+If you use a non-default or nonhuman reference, set `--genome_build other` and provide the FASTA explicitly. The workflow will build the `.fai` and BWA index files if they are missing. GRIDSS will still run `gridss_somatic_filter` in this mode; if you do not provide a PoN, it falls back to matched-normal filtering without `--pondir`:
 
 ```bash
 nextflow run main.nf -profile singularity \
   --csv samplesheet.csv \
   --genome_build other \
   --reference_fasta /path/to/genome.fa
+```
+
+If you have species-specific or custom GRIDSS PoN files, provide both explicitly:
+
+```bash
+nextflow run main.nf -profile singularity \
+  --csv samplesheet.csv \
+  --genome_build other \
+  --reference_fasta /path/to/genome.fa \
+  --gridss_sv_pon /path/to/gridss_pon_breakpoint.bedpe \
+  --gridss_sgl_pon /path/to/gridss_pon_single_breakend.bed
 ```
 
 You can override any derived human defaults with custom files:
@@ -62,12 +75,17 @@ nextflow run main.nf -profile singularity \
   --csv samplesheet.csv \
   --genome_build hg38 \
   --reference_fasta /path/to/custom_hg38.fa \
-  --gridss_blacklist /path/to/custom_blacklist.bed
+  --gridss_blacklist /path/to/custom_blacklist.bed \
+  --gridss_sv_pon /path/to/custom_gridss_pon_breakpoint.bedpe \
+  --gridss_sgl_pon /path/to/custom_gridss_pon_single_breakend.bed
 ```
 
 > [!NOTE]
 > The FASTA must still match the BAM contig names exactly. If your alignments were produced against a custom or differently named human reference, override the default FASTA and blacklist.
 > For the built-in human defaults, the workflow also normalizes the ENCODE blacklist contig names to match the 1000 Genomes reference naming.
+> Exact `--genome_build hg38` and `--genome_build hg19` still require a GRIDSS PoN and will auto-stage the HMF bundle unless you override it. `--genome_build other` is the only mode that permits running GRIDSS somatic filtering without a PoN.
+
+If you want to override the build-derived HMF bundle itself instead of providing extracted PoN files, set `--gridss_resource_bundle` to a local or remote `.tar.gz`/gzip-compressed tar archive containing the expected HMF resource layout.
 
 An archive file (10GB) with test BAM files and an indexed hg38 reference is [available on Zenodo (ID:15226469)](https://zenodo.org/records/15226469). To test the pipeline with the default online hg38 assets, extract the data archive into the repository root and run:
 

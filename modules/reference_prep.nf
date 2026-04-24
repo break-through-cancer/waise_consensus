@@ -174,3 +174,75 @@ process PREP_GRIDSS_ASSETS_WITH_BLACKLIST {
     cp gridss.properties.input gridss.properties
     """
 }
+
+process PREP_GRIDSS_PON_FROM_FILES {
+
+    label 'utility'
+
+    container 'gridss/gridss:2.13.2'
+
+    input:
+        path gridss_sv_pon_source
+        path gridss_sgl_pon_source
+
+    output:
+        path 'gridss_pon', emit: pondir
+
+    script:
+    """
+    set -euo pipefail
+
+    mkdir -p gridss_pon
+
+    if [[ "${gridss_sv_pon_source}" == *.gz ]]; then
+        gzip -dc ${gridss_sv_pon_source} > gridss_pon/gridss_pon_breakpoint.bedpe
+    else
+        cp ${gridss_sv_pon_source} gridss_pon/gridss_pon_breakpoint.bedpe
+    fi
+
+    if [[ "${gridss_sgl_pon_source}" == *.gz ]]; then
+        gzip -dc ${gridss_sgl_pon_source} > gridss_pon/gridss_pon_single_breakend.bed
+    else
+        cp ${gridss_sgl_pon_source} gridss_pon/gridss_pon_single_breakend.bed
+    fi
+    """
+}
+
+process PREP_GRIDSS_PON_FROM_BUNDLE {
+
+    label 'utility'
+
+    container 'gridss/gridss:2.13.2'
+
+    input:
+        path gridss_resource_bundle_source, name: 'gridss_resource_bundle.tar.gz'
+        val genome_build
+
+    output:
+        path 'gridss_pon', emit: pondir
+
+    script:
+    """
+    set -euo pipefail
+
+    mkdir -p gridss_pon
+
+    case "${genome_build}" in
+        hg38)
+            gridss_sv_pon_member='hmf_pipeline_resources.38_v2.3.0--2/dna/sv/sv_pon.38.bedpe.gz'
+            gridss_sgl_pon_member='hmf_pipeline_resources.38_v2.3.0--2/dna/sv/sgl_pon.38.bed.gz'
+            ;;
+        hg19)
+            gridss_sv_pon_member='hmf_pipeline_resources.37_v2.3.0--2/dna/sv/sv_pon.37.bedpe.gz'
+            gridss_sgl_pon_member='hmf_pipeline_resources.37_v2.3.0--2/dna/sv/sgl_pon.37.bed.gz'
+            ;;
+        *)
+            echo "Unsupported genome build for GRIDSS PoN extraction: ${genome_build}" >&2
+            exit 1
+            ;;
+    esac
+
+    tar -xOzf gridss_resource_bundle.tar.gz "${gridss_sv_pon_member}" | gzip -dc > gridss_pon/gridss_pon_breakpoint.bedpe
+    tar -xOzf gridss_resource_bundle.tar.gz "${gridss_sgl_pon_member}" | gzip -dc > gridss_pon/gridss_pon_single_breakend.bed
+    """
+}

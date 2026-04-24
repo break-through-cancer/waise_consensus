@@ -19,12 +19,12 @@ include { TUMOUR_FILTER as GRIDSS_TUMOUR_FILTER } from './modules/tumour_filter.
 
 include { TUMOUR_CONSENSUS_VCF } from './modules/tumour_consensus.nf'
 include { TUMOUR_CONSENSUS_CALL } from './modules/tumour_consensus.nf'
-include { PREP_REFERENCE; PREP_REFERENCE_WITH_INDEX; PREP_GRIDSS_ASSETS; PREP_GRIDSS_ASSETS_WITH_BLACKLIST } from './modules/reference_prep.nf'
+include { PREP_REFERENCE; PREP_REFERENCE_WITH_INDEX; PREP_GRIDSS_ASSETS; PREP_GRIDSS_ASSETS_WITH_BLACKLIST; PREP_GRIDSS_PON_FROM_FILES; PREP_GRIDSS_PON_FROM_BUNDLE } from './modules/reference_prep.nf'
 include { MANTA } from './modules/manta.nf'
 include { LUMPY } from './modules/lumpy.nf'
 include { SVABA } from './modules/svaba.nf'
 include { DELLY; DELLY_SPLIT } from './modules/delly.nf'
-include { GRIDSS } from './modules/gridss.nf'
+include { GRIDSS; GRIDSS_SOMATIC_FILTER_WITH_PON; GRIDSS_SOMATIC_FILTER_NO_PON; GRIDSS_TUMOUR_VCF; GRIDSS_NORMAL_VCF } from './modules/gridss.nf'
 
 workflow {
     def requestedBuild = (params.genome_build ?: 'hg38').toString().toLowerCase()
@@ -32,6 +32,7 @@ workflow {
     def normalizedBuild = buildAliases.containsKey(requestedBuild) ? buildAliases[requestedBuild] : requestedBuild
     def buildDefaults = (params.reference_defaults ?: [:])[normalizedBuild] ?: [:]
     def usingDerivedBlacklist = params.gridss_blacklist == null && buildDefaults.gridss_blacklist != null
+    def exactPonBuild = ['hg38', 'hg19'].contains(requestedBuild) ? requestedBuild : null
 
     if (!['hg38', 'hg19', 'other'].contains(normalizedBuild)) {
         error "Unsupported --genome_build '${params.genome_build}'. Use hg38, hg19, or other."
@@ -42,6 +43,13 @@ workflow {
     def referenceIndexValue = params.reference_index
     def gridssBlacklistValue = params.gridss_blacklist ?: buildDefaults.gridss_blacklist
     def gridssPropertiesValue = params.gridss_properties ?: params.default_gridss_properties
+    def gridssSvPonValue = params.gridss_sv_pon
+    def gridssSglPonValue = params.gridss_sgl_pon
+    def gridssResourceBundleDefault = exactPonBuild ? ((params.reference_defaults ?: [:])[exactPonBuild] ?: [:]).gridss_resource_bundle : null
+    def gridssResourceBundleValue = params.gridss_resource_bundle ?: gridssResourceBundleDefault
+    def hasExplicitGridssPon = gridssSvPonValue != null || gridssSglPonValue != null
+    def useAutoGridssPon = !hasExplicitGridssPon && exactPonBuild != null
+    def useGridssPon = hasExplicitGridssPon || useAutoGridssPon
 
     if (!csvValue) {
         error "Missing required parameter --csv. Provide a sample sheet or use -profile test."
@@ -75,6 +83,32 @@ workflow {
         error "Parameter --gridss_properties points to a missing local path: ${gridssPropertiesValue}"
     }
 
+    if ((gridssSvPonValue == null) != (gridssSglPonValue == null)) {
+        error "Provide both --gridss_sv_pon and --gridss_sgl_pon together, or omit both to use the build-derived GRIDSS resource bundle."
+    }
+
+    if (gridssSvPonValue && !(gridssSvPonValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssSvPonValue.toString()).exists()) {
+        error "Parameter --gridss_sv_pon points to a missing local path: ${gridssSvPonValue}"
+    }
+
+    if (gridssSglPonValue && !(gridssSglPonValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssSglPonValue.toString()).exists()) {
+        error "Parameter --gridss_sgl_pon points to a missing local path: ${gridssSglPonValue}"
+    }
+
+    if (useAutoGridssPon) {
+        if (!gridssResourceBundleValue) {
+            error "Missing GRIDSS resource bundle for --genome_build ${requestedBuild}. Provide --gridss_resource_bundle or both explicit GRIDSS PoN files."
+        }
+
+        if (!(gridssResourceBundleValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssResourceBundleValue.toString()).exists()) {
+            error "Parameter --gridss_resource_bundle points to a missing local path: ${gridssResourceBundleValue}"
+        }
+    } else if (!hasExplicitGridssPon && normalizedBuild != 'other') {
+        error "Automatic GRIDSS PoN extraction is only available for exact --genome_build hg38 and --genome_build hg19. Provide both --gridss_sv_pon and --gridss_sgl_pon for aliases or other builds."
+    } else if (!useGridssPon) {
+        log.warn "No GRIDSS PoN provided for --genome_build other. The workflow will run gridss_somatic_filter without --pondir."
+    }
+
     if (params.reference_fasta && usingDerivedBlacklist) {
         log.warn "Using a build-derived GRIDSS blacklist with a custom reference FASTA. The workflow will remap simple contig aliases against the staged reference, but you should still override --gridss_blacklist if your FASTA uses a non-canonical naming scheme."
     }
@@ -84,6 +118,7 @@ workflow {
     def prepared_reference
     def prepared_gridss_blacklist
     def prepared_gridss_properties
+    def prepared_gridss_pondir = null
 
     if (referenceIndexValue) {
         def reference_index_source = Channel.value(file(referenceIndexValue))
@@ -105,6 +140,17 @@ workflow {
         prepared_gridss_properties = PREP_GRIDSS_ASSETS.out.properties
     }
 
+    if (hasExplicitGridssPon) {
+        def gridss_sv_pon_source = Channel.value(file(gridssSvPonValue))
+        def gridss_sgl_pon_source = Channel.value(file(gridssSglPonValue))
+        PREP_GRIDSS_PON_FROM_FILES(gridss_sv_pon_source, gridss_sgl_pon_source)
+        prepared_gridss_pondir = PREP_GRIDSS_PON_FROM_FILES.out.pondir
+    } else if (useAutoGridssPon) {
+        def gridss_resource_bundle_source = Channel.value(file(gridssResourceBundleValue))
+        PREP_GRIDSS_PON_FROM_BUNDLE(gridss_resource_bundle_source, requestedBuild)
+        prepared_gridss_pondir = PREP_GRIDSS_PON_FROM_BUNDLE.out.pondir
+    }
+
     // Load inputs from csv
     def bam_channel = Channel
             .fromPath(csvValue)
@@ -124,6 +170,16 @@ workflow {
     DELLY(bam_channel, prepared_reference)
     DELLY_SPLIT(DELLY.out.id, DELLY.out.bcf)
     GRIDSS(bam_channel, prepared_reference, prepared_gridss_blacklist, prepared_gridss_properties)
+    def gridss_filtered_joint_vcf
+    if (useGridssPon) {
+        GRIDSS_SOMATIC_FILTER_WITH_PON(GRIDSS.out.joint_vcf, prepared_gridss_pondir)
+        gridss_filtered_joint_vcf = GRIDSS_SOMATIC_FILTER_WITH_PON.out.joint_vcf
+    } else {
+        GRIDSS_SOMATIC_FILTER_NO_PON(GRIDSS.out.joint_vcf)
+        gridss_filtered_joint_vcf = GRIDSS_SOMATIC_FILTER_NO_PON.out.joint_vcf
+    }
+    GRIDSS_NORMAL_VCF(GRIDSS.out.joint_vcf)
+    GRIDSS_TUMOUR_VCF(gridss_filtered_joint_vcf)
 
     // Combine VCFs from normal outputs
     manta_normals = MANTA.out.vcf_n.collect()
@@ -134,7 +190,7 @@ workflow {
     svaba_panel = SVABA_NORMAL_PANEL(svaba_normals, 'svaba')
     delly_normals = DELLY_SPLIT.out.vcf_n.collect()
     delly_panel = DELLY_NORMAL_PANEL(delly_normals, 'delly')
-    gridss_normals = GRIDSS.out.vcf_n.collect()
+    gridss_normals = GRIDSS_NORMAL_VCF.out.vcf_n.collect()
     gridss_panel = GRIDSS_NORMAL_PANEL(gridss_normals, 'gridss')
 
     // Filter tumor VCFs using panels
@@ -142,7 +198,7 @@ workflow {
     LUMPY_TUMOUR_FILTER(LUMPY.out.vcf_t, lumpy_panel, 'lumpy')
     SVABA_TUMOUR_FILTER(SVABA.out.vcf_t, svaba_panel, 'svaba')
     DELLY_TUMOUR_FILTER(DELLY_SPLIT.out.vcf_t, delly_panel, 'delly')
-    GRIDSS_TUMOUR_FILTER(GRIDSS.out.vcf_t, gridss_panel, 'gridss')
+    GRIDSS_TUMOUR_FILTER(GRIDSS_TUMOUR_VCF.out.vcf_t, gridss_panel, 'gridss')
     
     // Combine all tumor channels by Sample ID
     TUMOR_COMBINED = MANTA_TUMOUR_FILTER.out.filtered_vcf
