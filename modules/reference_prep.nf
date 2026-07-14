@@ -242,7 +242,7 @@ process PREP_GRIDSS_PON_FROM_BUNDLE {
             ;;
     esac
 
-    tar -xOzf gridss_resource_bundle.tar.gz "${gridss_sv_pon_member}" | gzip -dc > gridss_pon/gridss_pon_breakpoint.bedpe
-    tar -xOzf gridss_resource_bundle.tar.gz "${gridss_sgl_pon_member}" | gzip -dc > gridss_pon/gridss_pon_single_breakend.bed
+    tar -xOzf gridss_resource_bundle.tar.gz "\${gridss_sv_pon_member}" | gzip -dc > gridss_pon/gridss_pon_breakpoint.bedpe
+    tar -xOzf gridss_resource_bundle.tar.gz "\${gridss_sgl_pon_member}" | gzip -dc > gridss_pon/gridss_pon_single_breakend.bed
     """
 }
