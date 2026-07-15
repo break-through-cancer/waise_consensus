@@ -115,7 +115,11 @@ process GRIDSS_SOMATIC_FILTER_WITH_PON {
 
     mkdir -p ${gridsspl_outdir}
 
-    gridss_somatic_filter \
+    # The GRIDSS 2.13.2 wrapper can carry a CRLF Rscript shebang in some
+    # container builds, so invoke the R script explicitly.
+    gridss_somatic_filter_script="\$(command -v gridss_somatic_filter)"
+
+    Rscript "\$gridss_somatic_filter_script" \
         --input ${gridss_joint_vcf} \
         --output ${filtered_vcf} \
         --pondir ${gridss_pon_dir} \
@@ -146,7 +150,11 @@ process GRIDSS_SOMATIC_FILTER_NO_PON {
 
     mkdir -p ${gridsspl_outdir}
 
-    gridss_somatic_filter \
+    # The GRIDSS 2.13.2 wrapper can carry a CRLF Rscript shebang in some
+    # container builds, so invoke the R script explicitly.
+    gridss_somatic_filter_script="\$(command -v gridss_somatic_filter)"
+
+    Rscript "\$gridss_somatic_filter_script" \
         --input ${gridss_joint_vcf} \
         --output ${filtered_vcf} \
         --normalordinal 1 \
