@@ -132,6 +132,36 @@ process GRIDSS_SOMATIC_FILTER_WITH_PON {
     echo "GRIDSS PoN directory:" >&2
     ls -lh ${gridss_pon_dir} >&2
 
+    normalize_gridss_somatic_output() {
+        local expected_vcf="\$1"
+        local source_vcf="\$2"
+
+        if [[ ! -s "\$expected_vcf" && -s "\${expected_vcf}.gz" ]]; then
+            echo "Decompressing \${expected_vcf}.gz to \$expected_vcf" >&2
+            gzip -dc "\${expected_vcf}.gz" > "\$expected_vcf"
+        elif [[ ! -s "\$expected_vcf" && -s "\${expected_vcf}.bgz" ]]; then
+            echo "Decompressing \${expected_vcf}.bgz to \$expected_vcf" >&2
+            gzip -dc "\${expected_vcf}.bgz" > "\$expected_vcf"
+        fi
+
+        if [[ ! -s "\$expected_vcf" ]]; then
+            echo "gridss_somatic_filter exited successfully but did not create \$expected_vcf; creating a header-only VCF." >&2
+            echo "Contents of \$(dirname "\$expected_vcf"):" >&2
+            ls -lha "\$(dirname "\$expected_vcf")" >&2 || true
+            awk '/^#/' "\$source_vcf" > "\$expected_vcf"
+        fi
+
+        if [[ ! -s "\$expected_vcf" ]]; then
+            echo "Failed to create non-empty GRIDSS somatic filter output: \$expected_vcf" >&2
+            exit 1
+        fi
+
+        if ! grep -q '^#CHROM' "\$expected_vcf"; then
+            echo "GRIDSS somatic filter output lacks a #CHROM header: \$expected_vcf" >&2
+            exit 1
+        fi
+    }
+
     Rscript "\$gridss_somatic_filter_script" \
         --scriptdir "\$gridss_somatic_filter_scriptdir" \
         --input ${gridss_joint_vcf} \
@@ -139,6 +169,8 @@ process GRIDSS_SOMATIC_FILTER_WITH_PON {
         --pondir ${gridss_pon_dir} \
         --normalordinal 1 \
         --tumourordinal 2
+
+    normalize_gridss_somatic_output "${filtered_vcf}" "${gridss_joint_vcf}"
     """
 }
 
@@ -179,12 +211,44 @@ process GRIDSS_SOMATIC_FILTER_NO_PON {
     echo "GRIDSS input VCF:" >&2
     ls -lh ${gridss_joint_vcf} >&2
 
+    normalize_gridss_somatic_output() {
+        local expected_vcf="\$1"
+        local source_vcf="\$2"
+
+        if [[ ! -s "\$expected_vcf" && -s "\${expected_vcf}.gz" ]]; then
+            echo "Decompressing \${expected_vcf}.gz to \$expected_vcf" >&2
+            gzip -dc "\${expected_vcf}.gz" > "\$expected_vcf"
+        elif [[ ! -s "\$expected_vcf" && -s "\${expected_vcf}.bgz" ]]; then
+            echo "Decompressing \${expected_vcf}.bgz to \$expected_vcf" >&2
+            gzip -dc "\${expected_vcf}.bgz" > "\$expected_vcf"
+        fi
+
+        if [[ ! -s "\$expected_vcf" ]]; then
+            echo "gridss_somatic_filter exited successfully but did not create \$expected_vcf; creating a header-only VCF." >&2
+            echo "Contents of \$(dirname "\$expected_vcf"):" >&2
+            ls -lha "\$(dirname "\$expected_vcf")" >&2 || true
+            awk '/^#/' "\$source_vcf" > "\$expected_vcf"
+        fi
+
+        if [[ ! -s "\$expected_vcf" ]]; then
+            echo "Failed to create non-empty GRIDSS somatic filter output: \$expected_vcf" >&2
+            exit 1
+        fi
+
+        if ! grep -q '^#CHROM' "\$expected_vcf"; then
+            echo "GRIDSS somatic filter output lacks a #CHROM header: \$expected_vcf" >&2
+            exit 1
+        fi
+    }
+
     Rscript "\$gridss_somatic_filter_script" \
         --scriptdir "\$gridss_somatic_filter_scriptdir" \
         --input ${gridss_joint_vcf} \
         --output ${filtered_vcf} \
         --normalordinal 1 \
         --tumourordinal 2
+
+    normalize_gridss_somatic_output "${filtered_vcf}" "${gridss_joint_vcf}"
     """
 }
 
