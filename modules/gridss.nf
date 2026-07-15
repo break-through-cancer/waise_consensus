@@ -260,7 +260,7 @@ process GRIDSS_NORMAL_VCF {
         af
     }
 
-    mateid <- info(vcf)$MATEID
+    mateid <- info(vcf)\$MATEID
     if (is.null(mateid)) {
         stop("Missing INFO/MATEID in GRIDSS VCF; cannot distinguish breakpoint and single-breakend records.")
     }
@@ -273,7 +273,7 @@ process GRIDSS_NORMAL_VCF {
     }
 
     is_single_breakend <- !is_breakpoint
-    is_pass <- as.character(fixed(vcf)$FILTER) == "PASS"
+    is_pass <- as.character(fixed(vcf)\$FILTER) == "PASS"
 
     normal_ref <- extract_numeric_field("REF", 1)
     normal_refpair <- extract_numeric_field("REFPAIR", 1)
