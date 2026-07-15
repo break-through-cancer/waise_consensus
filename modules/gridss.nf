@@ -118,8 +118,15 @@ process GRIDSS_SOMATIC_FILTER_WITH_PON {
     # The GRIDSS 2.13.2 wrapper can carry a CRLF Rscript shebang in some
     # container builds, so invoke the R script explicitly.
     gridss_somatic_filter_script="\$(command -v gridss_somatic_filter)"
+    gridss_somatic_filter_lib="\$(find /opt/gridss /usr/local -name libgridss.R -print -quit 2>/dev/null || true)"
+    if [[ -z "\$gridss_somatic_filter_lib" ]]; then
+        echo "Could not find libgridss.R required by gridss_somatic_filter" >&2
+        exit 1
+    fi
+    gridss_somatic_filter_scriptdir="\$(dirname "\$gridss_somatic_filter_lib")"
 
     Rscript "\$gridss_somatic_filter_script" \
+        --scriptdir "\$gridss_somatic_filter_scriptdir" \
         --input ${gridss_joint_vcf} \
         --output ${filtered_vcf} \
         --pondir ${gridss_pon_dir} \
@@ -153,8 +160,15 @@ process GRIDSS_SOMATIC_FILTER_NO_PON {
     # The GRIDSS 2.13.2 wrapper can carry a CRLF Rscript shebang in some
     # container builds, so invoke the R script explicitly.
     gridss_somatic_filter_script="\$(command -v gridss_somatic_filter)"
+    gridss_somatic_filter_lib="\$(find /opt/gridss /usr/local -name libgridss.R -print -quit 2>/dev/null || true)"
+    if [[ -z "\$gridss_somatic_filter_lib" ]]; then
+        echo "Could not find libgridss.R required by gridss_somatic_filter" >&2
+        exit 1
+    fi
+    gridss_somatic_filter_scriptdir="\$(dirname "\$gridss_somatic_filter_lib")"
 
     Rscript "\$gridss_somatic_filter_script" \
+        --scriptdir "\$gridss_somatic_filter_scriptdir" \
         --input ${gridss_joint_vcf} \
         --output ${filtered_vcf} \
         --normalordinal 1 \
