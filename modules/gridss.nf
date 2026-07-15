@@ -125,6 +125,13 @@ process GRIDSS_SOMATIC_FILTER_WITH_PON {
     fi
     gridss_somatic_filter_scriptdir="\$(dirname "\$gridss_somatic_filter_lib")"
 
+    echo "gridss_somatic_filter: \$gridss_somatic_filter_script" >&2
+    echo "gridss_somatic_filter scriptdir: \$gridss_somatic_filter_scriptdir" >&2
+    echo "GRIDSS input VCF:" >&2
+    ls -lh ${gridss_joint_vcf} >&2
+    echo "GRIDSS PoN directory:" >&2
+    ls -lh ${gridss_pon_dir} >&2
+
     Rscript "\$gridss_somatic_filter_script" \
         --scriptdir "\$gridss_somatic_filter_scriptdir" \
         --input ${gridss_joint_vcf} \
@@ -167,6 +174,11 @@ process GRIDSS_SOMATIC_FILTER_NO_PON {
     fi
     gridss_somatic_filter_scriptdir="\$(dirname "\$gridss_somatic_filter_lib")"
 
+    echo "gridss_somatic_filter: \$gridss_somatic_filter_script" >&2
+    echo "gridss_somatic_filter scriptdir: \$gridss_somatic_filter_scriptdir" >&2
+    echo "GRIDSS input VCF:" >&2
+    ls -lh ${gridss_joint_vcf} >&2
+
     Rscript "\$gridss_somatic_filter_script" \
         --scriptdir "\$gridss_somatic_filter_scriptdir" \
         --input ${gridss_joint_vcf} \
@@ -200,22 +212,40 @@ process GRIDSS_TUMOUR_VCF {
 
     mkdir -p ${gridsspl_outdir}
 
-    GRIDSS_INPUT="${gridss_filtered_joint_vcf}" GRIDSS_OUTPUT="${tumour_vcf}" Rscript - <<'RSCRIPT'
-    suppressPackageStartupMessages(library(VariantAnnotation))
-
-    input_path <- Sys.getenv("GRIDSS_INPUT")
-    output_path <- Sys.getenv("GRIDSS_OUTPUT")
-
-    vcf <- readVcf(input_path)
-    sample_names <- samples(header(vcf))
-
-    if (length(sample_names) < 2) {
-        stop(sprintf("Expected a two-sample GRIDSS VCF but found %d sample(s) in %s", length(sample_names), input_path))
+    awk '
+    BEGIN {
+        FS = OFS = "\\t"
     }
-
-    tumour_vcf <- vcf[, 2, drop = FALSE]
-    writeVcf(tumour_vcf, output_path)
-RSCRIPT
+    function die(message) {
+        print message > "/dev/stderr"
+        exit 1
+    }
+    /^##/ {
+        print
+        next
+    }
+    /^#CHROM/ {
+        if (NF < 11) {
+            die("Expected at least two sample columns in GRIDSS VCF header")
+        }
+        print \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$11
+        saw_header = 1
+        next
+    }
+    {
+        if (!saw_header) {
+            die("Missing #CHROM header in GRIDSS VCF")
+        }
+        if (NF < 11) {
+            die("Expected at least two sample columns in GRIDSS VCF record")
+        }
+        print \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$11
+    }
+    END {
+        if (!saw_header) {
+            die("Missing #CHROM header in GRIDSS VCF")
+        }
+    }' ${gridss_filtered_joint_vcf} > ${tumour_vcf}
     """
 }
 
@@ -243,91 +273,124 @@ process GRIDSS_NORMAL_VCF {
 
     mkdir -p ${gridsspl_outdir}
 
-    GRIDSS_INPUT="${gridss_joint_vcf}" GRIDSS_OUTPUT="${normal_vcf}" Rscript - <<'RSCRIPT'
-    suppressPackageStartupMessages(library(VariantAnnotation))
-    suppressPackageStartupMessages(library(S4Vectors))
-
-    input_path <- Sys.getenv("GRIDSS_INPUT")
-    output_path <- Sys.getenv("GRIDSS_OUTPUT")
-
-    vcf <- readVcf(input_path)
-    sample_names <- samples(header(vcf))
-
-    if (length(sample_names) < 2) {
-        stop(sprintf("Expected a two-sample GRIDSS VCF but found %d sample(s) in %s", length(sample_names), input_path))
+    awk '
+    BEGIN {
+        FS = OFS = "\\t"
     }
-
-    genotype <- geno(vcf)
-    required_fields <- c("REF", "REFPAIR", "VF", "BVF")
-    missing_fields <- setdiff(required_fields, names(genotype))
-
-    if (length(missing_fields) > 0) {
-        stop(sprintf(
-            "Missing GRIDSS FORMAT field(s) required for normal VCF extraction: %s",
-            paste(missing_fields, collapse = ", ")
-        ))
+    function die(message) {
+        print message > "/dev/stderr"
+        exit 1
     }
-
-    extract_numeric_field <- function(field_name, sample_index) {
-        values <- genotype[[field_name]][, sample_index, drop = TRUE]
-        values <- as.numeric(values)
-        values[is.na(values)] <- 0
-        values
+    function split_format(format_string, index_by_name,   count, i, fields) {
+        delete index_by_name
+        count = split(format_string, fields, ":")
+        for (i = 1; i <= count; i++) {
+            index_by_name[fields[i]] = i
+        }
     }
-
-    safe_af <- function(variant_support, ref_support, refpair_support) {
-        depth <- variant_support + ref_support + refpair_support
-        af <- ifelse(depth > 0, variant_support / depth, 0)
-        af[is.na(af)] <- 0
-        af
+    function require_format(index_by_name, field_name) {
+        if (!(field_name in index_by_name)) {
+            die("Missing GRIDSS FORMAT field required for normal VCF extraction: " field_name)
+        }
     }
-
-    mateid <- info(vcf)\$MATEID
-    if (is.null(mateid)) {
-        stop("Missing INFO/MATEID in GRIDSS VCF; cannot distinguish breakpoint and single-breakend records.")
+    function numeric_sample_field(sample_string, index_by_name, field_name,   fields, value) {
+        split(sample_string, fields, ":")
+        value = fields[index_by_name[field_name]]
+        if (value == "" || value == "." || value ~ /,/) {
+            return 0
+        }
+        return value + 0
     }
-
-    if (inherits(mateid, "CharacterList")) {
-        is_breakpoint <- elementNROWS(mateid) > 0
-    } else {
-        mateid_values <- as.character(mateid)
-        is_breakpoint <- !is.na(mateid_values) & nzchar(mateid_values)
+    function has_mateid(info_string,   count, i, fields, value) {
+        if (info_string == "" || info_string == ".") {
+            return 0
+        }
+        count = split(info_string, fields, ";")
+        for (i = 1; i <= count; i++) {
+            if (fields[i] == "MATEID") {
+                return 1
+            }
+            if (fields[i] ~ /^MATEID=/) {
+                value = substr(fields[i], 8)
+                return value != "" && value != "."
+            }
+        }
+        return 0
     }
+    function safe_af(variant_support, ref_support, refpair_support,   depth) {
+        depth = variant_support + ref_support + refpair_support
+        if (depth > 0) {
+            return variant_support / depth
+        }
+        return 0
+    }
+    /^##INFO=<ID=MATEID[,>]/ {
+        has_mateid_header = 1
+        print
+        next
+    }
+    /^##/ {
+        print
+        next
+    }
+    /^#CHROM/ {
+        if (NF < 11) {
+            die("Expected at least two sample columns in GRIDSS VCF header")
+        }
+        print \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10
+        saw_header = 1
+        next
+    }
+    {
+        if (!saw_header) {
+            die("Missing #CHROM header in GRIDSS VCF")
+        }
+        if (!has_mateid_header) {
+            die("Missing INFO/MATEID header in GRIDSS VCF; cannot distinguish breakpoint and single-breakend records.")
+        }
+        if (NF < 11) {
+            die("Expected at least two sample columns in GRIDSS VCF record")
+        }
 
-    is_single_breakend <- !is_breakpoint
-    is_pass <- as.character(fixed(vcf)\$FILTER) == "PASS"
+        split_format(\$9, format_index)
+        require_format(format_index, "REF")
+        require_format(format_index, "REFPAIR")
+        require_format(format_index, "VF")
+        require_format(format_index, "BVF")
 
-    normal_ref <- extract_numeric_field("REF", 1)
-    normal_refpair <- extract_numeric_field("REFPAIR", 1)
-    tumour_ref <- extract_numeric_field("REF", 2)
-    tumour_refpair <- extract_numeric_field("REFPAIR", 2)
+        normal_ref = numeric_sample_field(\$10, format_index, "REF")
+        normal_refpair = numeric_sample_field(\$10, format_index, "REFPAIR")
+        tumour_ref = numeric_sample_field(\$11, format_index, "REF")
+        tumour_refpair = numeric_sample_field(\$11, format_index, "REFPAIR")
 
-    normal_vf <- extract_numeric_field("VF", 1)
-    tumour_vf <- extract_numeric_field("VF", 2)
-    normal_bvf <- extract_numeric_field("BVF", 1)
-    tumour_bvf <- extract_numeric_field("BVF", 2)
+        normal_vf = numeric_sample_field(\$10, format_index, "VF")
+        tumour_vf = numeric_sample_field(\$11, format_index, "VF")
+        normal_bvf = numeric_sample_field(\$10, format_index, "BVF")
+        tumour_bvf = numeric_sample_field(\$11, format_index, "BVF")
 
-    normal_bp_af <- safe_af(normal_vf, normal_ref, normal_refpair)
-    tumour_bp_af <- safe_af(tumour_vf, tumour_ref, tumour_refpair)
-    normal_be_af <- safe_af(normal_bvf, normal_ref, normal_refpair)
-    tumour_be_af <- safe_af(tumour_bvf, tumour_ref, tumour_refpair)
+        normal_bp_af = safe_af(normal_vf, normal_ref, normal_refpair)
+        tumour_bp_af = safe_af(tumour_vf, tumour_ref, tumour_refpair)
+        normal_be_af = safe_af(normal_bvf, normal_ref, normal_refpair)
+        tumour_be_af = safe_af(tumour_bvf, tumour_ref, tumour_refpair)
 
-    keep_breakpoints <- is_breakpoint &
-        is_pass &
-        normal_bp_af >= 0.10 &
-        normal_vf >= 4 &
-        tumour_bp_af <= (3 * normal_bp_af)
+        is_breakpoint = has_mateid(\$8)
+        is_single_breakend = !is_breakpoint
+        is_pass = \$7 == "PASS"
 
-    keep_single_breakends <- is_single_breakend &
-        is_pass &
-        normal_be_af >= 0.10 &
-        normal_bvf >= 4 &
-        tumour_be_af <= (3 * normal_be_af)
+        keep_breakpoint = is_breakpoint && is_pass && normal_bp_af >= 0.10 && normal_vf >= 4 && tumour_bp_af <= (3 * normal_bp_af)
+        keep_single_breakend = is_single_breakend && is_pass && normal_be_af >= 0.10 && normal_bvf >= 4 && tumour_be_af <= (3 * normal_be_af)
 
-    keep_in_normal <- keep_breakpoints | keep_single_breakends
-    normal_vcf <- vcf[keep_in_normal, 1, drop = FALSE]
-
-    writeVcf(normal_vcf, output_path)
-RSCRIPT
+        if (keep_breakpoint || keep_single_breakend) {
+            print \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8, \$9, \$10
+        }
+    }
+    END {
+        if (!saw_header) {
+            die("Missing #CHROM header in GRIDSS VCF")
+        }
+        if (!has_mateid_header) {
+            die("Missing INFO/MATEID header in GRIDSS VCF; cannot distinguish breakpoint and single-breakend records.")
+        }
+    }' ${gridss_joint_vcf} > ${normal_vcf}
     """
 }
