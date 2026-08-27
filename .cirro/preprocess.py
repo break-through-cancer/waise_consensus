@@ -2,8 +2,6 @@
 
 from cirro.helpers.preprocess_dataset import PreprocessDataset
 import pandas as pd
-import numpy as np
-import re
 
 # 1. Get parameters from cirro pipeline call
 ds = PreprocessDataset.from_running()
@@ -18,6 +16,7 @@ ds.logger.info(files.columns)
 # 2. Add samplesheet parameter and set equal to ds.samplesheet
 ds.logger.info("Checking samplesheet parameter")
 ds.logger.info(ds.samplesheet)
+samples = ds.samplesheet.set_index("sample") if "sample" in ds.samplesheet.columns else pd.DataFrame()
 
 # create samplesheet from ds.files
 df = ds.files.copy()
@@ -26,11 +25,25 @@ df = ds.files.copy()
 df["is_bai"] = df["file"].str.endswith(".bai")
 df["filetype"] = df["is_bai"].map({True: "bai", False: "bam"})
 
-# case id = everything before .S<number>... or .PBMC
-df["case_id"] = df["sample"].str.extract(r"^(.*?)(?:\.S\d+.*|\.PBMC)$", expand=False)
+# case_id: prefer an explicit 'patient' column from the Cirro sample sheet so
+# grouping doesn't depend on any particular sample-naming scheme. Fall back to
+# the "<case>.S<n>..."/"<case>.PBMC" convention for datasets that rely on
+# naming instead of sample metadata, then to the sample name itself (each
+# sample is its own case) if neither yields a value.
+name_case_id = df["sample"].str.extract(r"^(.*?)(?:\.S\d+.*|\.PBMC)$", expand=False)
+meta_case_id = df["sample"].map(samples["patient"]) if "patient" in samples.columns else pd.Series(pd.NA, index=df.index, dtype=object)
+df["case_id"] = meta_case_id.fillna(name_case_id).fillna(df["sample"]).astype(str)
 
-# role
-df["role"] = df["sample"].str.contains(r"\.PBMC$", regex=True).map({True: "normal", False: "tumor"})
+# role: prefer an explicit 'status' column (tumor/normal, case-insensitive, or
+# sarek-style 1/0). Fall back to the ".PBMC" naming convention, then default
+# to "tumor" -- this pipeline's primary use case is SV calling on a subject BAM.
+_status_map = {"tumor": "tumor", "1": "tumor", "normal": "normal", "0": "normal"}
+meta_role = (
+    df["sample"].map(samples["status"]).astype(str).str.lower().map(_status_map)
+    if "status" in samples.columns else pd.Series(pd.NA, index=df.index, dtype=object)
+)
+name_role = df["sample"].str.contains(r"\.PBMC$", regex=True).map({True: "normal", False: "tumor"})
+df["role"] = meta_role.fillna(name_role)
 
 # one row per sample with bam/bai split out
 per_sample = (
