@@ -21,6 +21,14 @@ samples = ds.samplesheet.set_index("sample") if "sample" in ds.samplesheet.colum
 # create samplesheet from ds.files
 df = ds.files.copy()
 
+# Some sources (e.g. sarek align output) provide both a 'recalibrated' and a
+# 'markduplicates' BAM/BAI per sample. Without this, the bam/bai pivot below
+# groups by filetype only and can pair a BAM with a BAI from the other
+# bamType (e.g. recal.bam with md.bam.bai) since neither is unique per sample.
+if "bamType" in df.columns:
+    has_recal = df.groupby("sample")["bamType"].transform(lambda s: (s == "recalibrated").any())
+    df = df[~((df["bamType"] == "markduplicates") & has_recal)]
+
 # file type from path
 df["is_bai"] = df["file"].str.endswith(".bai")
 df["filetype"] = df["is_bai"].map({True: "bai", False: "bam"})
