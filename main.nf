@@ -63,23 +63,23 @@ workflow {
         log.warn "Ignoring --reference_index for compressed FASTA inputs because the pipeline rebuilds the .fai after decompression."
     }
 
-    if (!(csvValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(csvValue.toString()).exists()) {
+    if (!(csvValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(csvValue.toString()).exists()) {
         error "Parameter --csv points to a missing local path: ${csvValue}"
     }
 
-    if (!(referenceFastaValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(referenceFastaValue.toString()).exists()) {
+    if (!(referenceFastaValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(referenceFastaValue.toString()).exists()) {
         error "Parameter --reference_fasta points to a missing local path: ${referenceFastaValue}"
     }
 
-    if (referenceIndexValue && !(referenceIndexValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(referenceIndexValue.toString()).exists()) {
+    if (referenceIndexValue && !(referenceIndexValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(referenceIndexValue.toString()).exists()) {
         error "Parameter --reference_index points to a missing local path: ${referenceIndexValue}"
     }
 
-    if (gridssBlacklistValue && !(gridssBlacklistValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssBlacklistValue.toString()).exists()) {
+    if (gridssBlacklistValue && !(gridssBlacklistValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(gridssBlacklistValue.toString()).exists()) {
         error "Parameter --gridss_blacklist points to a missing local path: ${gridssBlacklistValue}"
     }
 
-    if (gridssPropertiesValue && !(gridssPropertiesValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssPropertiesValue.toString()).exists()) {
+    if (gridssPropertiesValue && !(gridssPropertiesValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(gridssPropertiesValue.toString()).exists()) {
         error "Parameter --gridss_properties points to a missing local path: ${gridssPropertiesValue}"
     }
 
@@ -87,11 +87,11 @@ workflow {
         error "Provide both --gridss_sv_pon and --gridss_sgl_pon together, or omit both to use the build-derived GRIDSS resource bundle."
     }
 
-    if (gridssSvPonValue && !(gridssSvPonValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssSvPonValue.toString()).exists()) {
+    if (gridssSvPonValue && !(gridssSvPonValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(gridssSvPonValue.toString()).exists()) {
         error "Parameter --gridss_sv_pon points to a missing local path: ${gridssSvPonValue}"
     }
 
-    if (gridssSglPonValue && !(gridssSglPonValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssSglPonValue.toString()).exists()) {
+    if (gridssSglPonValue && !(gridssSglPonValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(gridssSglPonValue.toString()).exists()) {
         error "Parameter --gridss_sgl_pon points to a missing local path: ${gridssSglPonValue}"
     }
 
@@ -100,7 +100,7 @@ workflow {
             error "Missing GRIDSS resource bundle for --genome_build ${requestedBuild}. Provide --gridss_resource_bundle or both explicit GRIDSS PoN files."
         }
 
-        if (!(gridssResourceBundleValue.toString() ==~ /^(https?|ftp):\/\/.+/) && !new File(gridssResourceBundleValue.toString()).exists()) {
+        if (!(gridssResourceBundleValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(gridssResourceBundleValue.toString()).exists()) {
             error "Parameter --gridss_resource_bundle points to a missing local path: ${gridssResourceBundleValue}"
         }
     } else if (!hasExplicitGridssPon && normalizedBuild != 'other') {
