@@ -69,9 +69,9 @@
       },
       "consensus_min_support": {
         "title": "Consensus Minimum Support",
-        "description": "Minimum number of enabled callers that must agree on an SV to keep it. Leave blank to require all enabled callers (n/n). Must not exceed the number of enabled callers",
+        "description": "Minimum number of enabled callers that must agree on an SV to keep it. Leave blank to require all enabled callers (n/n). Must be at least 2, and must not exceed the number of enabled callers",
         "type": "integer",
-        "minimum": 1
+        "minimum": 2
       }
     },
     "required": [

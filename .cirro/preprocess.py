@@ -8,6 +8,35 @@ ds = PreprocessDataset.from_running()
 ds.logger.info("List of starting params")
 ds.logger.info(ds.params)
 
+# 1b. Validate SV caller selection / consensus threshold before doing any other
+# work, so a bad combination fails fast here rather than after the Nextflow
+# workflow has already started. Mirrors the equivalent checks in main.nf.
+_caller_defaults = {
+    "run_manta": True,
+    "run_lumpy": True,
+    "run_svaba": True,
+    "run_delly": True,
+    "run_gridss": True,
+}
+enabled_callers = {name: bool(ds.params.get(name, default)) for name, default in _caller_defaults.items()}
+enabled_count = sum(enabled_callers.values())
+ds.logger.info(f"Enabled callers: {sorted(n for n, on in enabled_callers.items() if on)} ({enabled_count} of {len(enabled_callers)})")
+
+if enabled_count < 2:
+    raise ValueError(
+        f"Consensus calling requires at least 2 enabled SV callers, got {enabled_count} "
+        f"({enabled_callers}). Enable more callers before launching this analysis."
+    )
+
+consensus_min_support = ds.params.get("consensus_min_support")
+if consensus_min_support is not None:
+    consensus_min_support = int(consensus_min_support)
+    if not (1 <= consensus_min_support <= enabled_count):
+        raise ValueError(
+            f"consensus_min_support must be between 1 and the number of enabled callers "
+            f"({enabled_count}); got {consensus_min_support}."
+        )
+
 ds.logger.info('checking ds.files')
 files = ds.files
 ds.logger.info(files.head())
