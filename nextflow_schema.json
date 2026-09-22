@@ -130,8 +130,8 @@
       "properties": {
         "consensus_min_support": {
           "type": "integer",
-          "minimum": 1,
-          "description": "Minimum number of enabled callers that must agree on an SV for it to survive consensus filtering. Defaults to requiring every enabled caller (n/n). Must not exceed the number of enabled callers."
+          "minimum": 2,
+          "description": "Minimum number of enabled callers that must agree on an SV for it to survive consensus filtering. Defaults to requiring every enabled caller (n/n). Must be at least 2, and must not exceed the number of enabled callers."
         }
       }
     }

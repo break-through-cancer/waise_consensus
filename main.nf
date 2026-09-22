@@ -81,8 +81,8 @@ workflow {
     def consensusMinSupportParam = params.consensus_min_support
     if (consensusMinSupportParam != null) {
         def parsedMinSupport = consensusMinSupportParam as Integer
-        if (parsedMinSupport < 1 || parsedMinSupport > enabledCallerCount) {
-            error "--consensus_min_support must be between 1 and the number of enabled callers (${enabledCallerCount}); got ${consensusMinSupportParam}."
+        if (parsedMinSupport < 2 || parsedMinSupport > enabledCallerCount) {
+            error "--consensus_min_support must be between 2 and the number of enabled callers (${enabledCallerCount}); got ${consensusMinSupportParam}."
         }
     }
     def consensusMinSupport = (consensusMinSupportParam != null) ? (consensusMinSupportParam as Integer) : enabledCallerCount
