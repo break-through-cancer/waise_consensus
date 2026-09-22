@@ -33,9 +33,9 @@ The workflow uses Jasmine twice.
 
 First, it builds a caller-specific normal panel. For each caller, all normal VCFs are merged with Jasmine in [modules/jasmine_panel.nf](/Users/youyun/Documents/HMS/PhD/beroukhimlab/BTC/Code/waise_consensus/modules/jasmine_panel.nf). The merged panel is then filtered to keep only recurring events with `INFO/SUPP > 1` at [modules/jasmine_panel.nf:23](/Users/youyun/Documents/HMS/PhD/beroukhimlab/BTC/Code/waise_consensus/modules/jasmine_panel.nf:23). Here, `SUPP` is the number of normal samples supporting a recurrent event for that one caller.
 
-Second, each sample's tumor VCFs are filtered against those caller-specific normal panels, then the five filtered caller VCFs are merged into one Jasmine consensus VCF in [main.nf:275](/Users/youyun/Documents/HMS/PhD/beroukhimlab/BTC/Code/waise_consensus/main.nf:275) and [modules/tumour_consensus.nf:46](/Users/youyun/Documents/HMS/PhD/beroukhimlab/BTC/Code/waise_consensus/modules/tumour_consensus.nf:46). In that step, the five inputs are one filtered VCF per caller for a single case, so `SUPP` measures caller support rather than cohort frequency.
+Second, each sample's tumor VCFs are filtered against those caller-specific normal panels, then the filtered VCFs from every *enabled* caller are merged into one Jasmine consensus VCF in `main.nf` and `modules/tumour_consensus.nf`. In that step, the inputs are one filtered VCF per enabled caller for a single case, so `SUPP` measures caller support rather than cohort frequency.
 
-The final tumor consensus filter keeps only `INFO/SUPP > 4` at [modules/tumour_consensus.nf:69](/Users/youyun/Documents/HMS/PhD/beroukhimlab/BTC/Code/waise_consensus/modules/tumour_consensus.nf:69). Because this workflow currently merges five caller VCFs per case, that is effectively an "all five callers support this event" rule.
+Each of the five callers (Manta, LUMPY, SvABA, DELLY, GRIDSS) can be switched off via `--run_<caller> false`, and consensus calling requires at least 2 enabled callers. The final tumor consensus filter keeps `INFO/SUPP >= consensus_min_support` in `modules/tumour_consensus.nf`, where `consensus_min_support` defaults to the number of enabled callers (an "all enabled callers agree" rule) and can be lowered via `--consensus_min_support` to require agreement from only a subset.
 
 ## SV Caller Snapshot
 

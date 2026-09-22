@@ -36,6 +36,7 @@ process TUMOUR_CONSENSUS_CALL {
     input:
         val id
         path vcf
+        val min_support
 
     output:
         path "${id}_tumor_cons.vcf", emit: panel_vcf
@@ -45,6 +46,6 @@ process TUMOUR_CONSENSUS_CALL {
 
     """
     awk '/^##INFO=<ID=SUPP/ { sub("Type=String", "Type=Integer"); } { print }' ${vcf} > tmp.vcf0
-    bcftools filter -i "INFO/SUPP > 4" tmp.vcf0 > ${id}_tumor_cons.vcf
+    bcftools filter -i "INFO/SUPP >= ${min_support}" tmp.vcf0 > ${id}_tumor_cons.vcf
     """
 }

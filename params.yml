@@ -1,0 +1,44 @@
+# Example params file for this pipeline.
+#
+# Run with:
+#   nextflow run . -profile singularity -params-file params.yml
+#
+# Using -params-file (YAML/JSON) is preferred over passing flags like
+# --run_gridss false on the command line: Nextflow parses CLI flag values
+# as strings, so --run_gridss false becomes the *string* "false", which is
+# truthy in Groovy and silently fails to disable anything. A params file
+# preserves real YAML types (booleans stay booleans, integers stay
+# integers), so this ambiguity doesn't apply here.
+#
+# Uncomment/edit the lines you need; anything left commented out falls
+# back to the default in nextflow.config.
+
+# --- Input/output -----------------------------------------------------
+csv: "test.csv"               # required: sample sheet (id, tumor_bam, tumor_bai, normal_bam, normal_bai)
+# publishDir: "results"
+
+# --- Reference genome ---------------------------------------------------
+# genome_build: "hg38"          # hg38 | hg19 | other
+# reference_fasta: null         # required if genome_build: other
+# reference_index: null
+
+# --- GRIDSS (only used if run_gridss: true) ------------------------------
+# gridss_blacklist: null
+# gridss_properties: null
+# gridss_sv_pon: null           # must be set together with gridss_sgl_pon
+# gridss_sgl_pon: null
+# gridss_resource_bundle: null
+
+# --- SV caller selection -------------------------------------------------
+# At least 2 callers must stay enabled for consensus calling to run.
+run_manta: true
+run_lumpy: true
+run_svaba: true
+run_delly: true
+run_gridss: true
+
+# --- Consensus calling ----------------------------------------------------
+# Minimum number of enabled callers that must agree on an SV to keep it.
+# Leave unset/null to require every enabled caller (n/n). Must not exceed
+# the number of enabled callers above.
+consensus_min_support: null

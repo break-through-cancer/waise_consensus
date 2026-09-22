@@ -36,6 +36,42 @@
         "multiple": false,
         "pathType": "reference",
         "file": "**/*"
+      },
+      "run_manta": {
+        "title": "Run Manta",
+        "description": "Include Manta in the consensus call",
+        "type": "boolean",
+        "default": true
+      },
+      "run_lumpy": {
+        "title": "Run LUMPY",
+        "description": "Include LUMPY (via smoove) in the consensus call",
+        "type": "boolean",
+        "default": true
+      },
+      "run_svaba": {
+        "title": "Run SvABA",
+        "description": "Include SvABA in the consensus call",
+        "type": "boolean",
+        "default": true
+      },
+      "run_delly": {
+        "title": "Run DELLY",
+        "description": "Include DELLY in the consensus call",
+        "type": "boolean",
+        "default": true
+      },
+      "run_gridss": {
+        "title": "Run GRIDSS",
+        "description": "Include GRIDSS in the consensus call. Turning this off also skips all GRIDSS reference/blacklist/PoN requirements above",
+        "type": "boolean",
+        "default": true
+      },
+      "consensus_min_support": {
+        "title": "Consensus Minimum Support",
+        "description": "Minimum number of enabled callers that must agree on an SV to keep it. Leave blank to require all enabled callers (n/n). Must not exceed the number of enabled callers",
+        "type": "integer",
+        "minimum": 1
       }
     },
     "required": [

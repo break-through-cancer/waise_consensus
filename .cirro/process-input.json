@@ -3,5 +3,11 @@
   "genome_build": "$.dataset.params.genome_build",
   "reference_fasta": "$.dataset.params.reference_fasta",
   "gridss_blacklist": "$.dataset.params.gridss_blacklist",
-  "gridss_properties": "$.dataset.params.gridss_properties"
+  "gridss_properties": "$.dataset.params.gridss_properties",
+  "run_manta": "$.dataset.params.run_manta",
+  "run_lumpy": "$.dataset.params.run_lumpy",
+  "run_svaba": "$.dataset.params.run_svaba",
+  "run_delly": "$.dataset.params.run_delly",
+  "run_gridss": "$.dataset.params.run_gridss",
+  "consensus_min_support": "$.dataset.params.consensus_min_support"
 }

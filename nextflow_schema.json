@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "$id": "https://raw.githubusercontent.com/break-through-cancer/waise_consensus/main/nextflow_schema.json",
+  "title": "waise_consensus pipeline parameters",
+  "description": "Consensus structural variant (SV) calling pipeline (Waise et al., 2025): runs Manta, LUMPY, SvABA, DELLY, and GRIDSS on matched tumor-normal BAMs, panel-of-normals filters each caller's tumor calls, and merges the survivors into a Jasmine consensus VCF.",
+  "type": "object",
+  "definitions": {
+    "input_output_options": {
+      "title": "Input/output options",
+      "type": "object",
+      "description": "Define where the pipeline should find input data and save output data.",
+      "properties": {
+        "csv": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Path to a comma-separated sample sheet with columns: id, tumor_bam, tumor_bai, normal_bam, normal_bai."
+        },
+        "publishDir": {
+          "type": "string",
+          "default": "results",
+          "description": "Directory to publish pipeline outputs to."
+        }
+      },
+      "required": [
+        "csv"
+      ]
+    },
+    "reference_genome_options": {
+      "title": "Reference genome options",
+      "type": "object",
+      "properties": {
+        "genome_build": {
+          "type": "string",
+          "default": "hg38",
+          "enum": [
+            "hg38",
+            "hg19",
+            "other"
+          ],
+          "description": "Reference genome build. Aliases (grch38/38, grch37/b37/hs37d5/37) are normalized automatically. Use 'other' to supply a custom reference via --reference_fasta."
+        },
+        "reference_fasta": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Reference FASTA (optionally .gz). Required when --genome_build other; otherwise defaults to a build-matched public reference."
+        },
+        "reference_index": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Pre-built .fai index for --reference_fasta. Ignored for compressed (.gz) FASTA inputs, which are always re-indexed after decompression."
+        }
+      },
+      "required": [
+        "genome_build"
+      ]
+    },
+    "gridss_options": {
+      "title": "GRIDSS options",
+      "type": "object",
+      "description": "Only used when --run_gridss is true (see 'SV caller selection' below).",
+      "properties": {
+        "gridss_blacklist": {
+          "type": "string",
+          "format": "file-path",
+          "description": "GRIDSS blacklist BED file. Build-matched defaults are available for hg38/hg19."
+        },
+        "gridss_properties": {
+          "type": "string",
+          "format": "file-path",
+          "description": "GRIDSS properties file. Defaults to the upstream GRIDSS repository's reference properties."
+        },
+        "gridss_sv_pon": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Explicit GRIDSS structural-variant panel-of-normals directory/file. Must be supplied together with --gridss_sgl_pon."
+        },
+        "gridss_sgl_pon": {
+          "type": "string",
+          "format": "file-path",
+          "description": "Explicit GRIDSS single-breakend panel-of-normals directory/file. Must be supplied together with --gridss_sv_pon."
+        },
+        "gridss_resource_bundle": {
+          "type": "string",
+          "format": "file-path",
+          "description": "HMF pipeline resource bundle used to auto-derive a GRIDSS panel-of-normals for exact --genome_build hg38/hg19 when no explicit PoN is given."
+        },
+        "default_gridss_properties": {
+          "type": "string",
+          "hidden": true,
+          "default": "https://raw.githubusercontent.com/PapenfussLab/gridss/825bc8e1bb092e9bb2ccb0c1c51dc6e7e1a922dd/src/main/resources/gridss.properties",
+          "description": "Fallback source for --gridss_properties when not otherwise supplied."
+        }
+      }
+    },
+    "caller_selection_options": {
+      "title": "SV caller selection",
+      "type": "object",
+      "description": "Enable or disable individual SV callers. At least 2 callers must stay enabled for consensus calling to run.",
+      "properties": {
+        "run_manta": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run Manta and include it in the consensus."
+        },
+        "run_lumpy": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run LUMPY (via smoove) and include it in the consensus."
+        },
+        "run_svaba": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run SvABA and include it in the consensus."
+        },
+        "run_delly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run DELLY and include it in the consensus."
+        },
+        "run_gridss": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run GRIDSS and include it in the consensus. Disabling this also skips all GRIDSS asset validation and preparation, so GRIDSS-specific inputs are not required."
+        }
+      }
+    },
+    "consensus_options": {
+      "title": "Consensus calling options",
+      "type": "object",
+      "properties": {
+        "consensus_min_support": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum number of enabled callers that must agree on an SV for it to survive consensus filtering. Defaults to requiring every enabled caller (n/n). Must not exceed the number of enabled callers."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "#/definitions/input_output_options"
+    },
+    {
+      "$ref": "#/definitions/reference_genome_options"
+    },
+    {
+      "$ref": "#/definitions/gridss_options"
+    },
+    {
+      "$ref": "#/definitions/caller_selection_options"
+    },
+    {
+      "$ref": "#/definitions/consensus_options"
+    }
+  ]
+}
