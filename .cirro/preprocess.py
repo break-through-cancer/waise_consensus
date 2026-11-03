@@ -122,7 +122,7 @@ print(samplesheet)
 
 
 #%%
-samplesheet.head(1).to_csv("samplesheet.csv", index=False)
+samplesheet.to_csv("samplesheet.csv", index=False)
 ds.add_param("csv", "samplesheet.csv")
 
 ds.logger.info(ds.params)
