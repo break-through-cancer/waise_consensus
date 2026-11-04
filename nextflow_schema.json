@@ -123,17 +123,6 @@
           "description": "Run GRIDSS and include it in the consensus. Disabling this also skips all GRIDSS asset validation and preparation, so GRIDSS-specific inputs are not required."
         }
       }
-    },
-    "consensus_options": {
-      "title": "Consensus calling options",
-      "type": "object",
-      "properties": {
-        "consensus_min_support": {
-          "type": "integer",
-          "minimum": 2,
-          "description": "Minimum number of enabled callers that must agree on an SV for it to survive consensus filtering. Defaults to requiring every enabled caller (n/n). Must be at least 2, and must not exceed the number of enabled callers."
-        }
-      }
     }
   },
   "allOf": [
@@ -148,9 +137,6 @@
     },
     {
       "$ref": "#/definitions/caller_selection_options"
-    },
-    {
-      "$ref": "#/definitions/consensus_options"
     }
   ]
 }

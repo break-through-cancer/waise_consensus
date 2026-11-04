@@ -78,15 +78,6 @@ workflow {
         error "Consensus calling requires at least 2 enabled SV callers (got ${enabledCallerCount}). Enable more via --run_manta/--run_lumpy/--run_svaba/--run_delly/--run_gridss."
     }
 
-    def consensusMinSupportParam = params.consensus_min_support
-    if (consensusMinSupportParam != null) {
-        def parsedMinSupport = consensusMinSupportParam as Integer
-        if (parsedMinSupport < 2 || parsedMinSupport > enabledCallerCount) {
-            error "--consensus_min_support must be between 2 and the number of enabled callers (${enabledCallerCount}); got ${consensusMinSupportParam}."
-        }
-    }
-    def consensusMinSupport = (consensusMinSupportParam != null) ? (consensusMinSupportParam as Integer) : enabledCallerCount
-
     def reference_fasta_source = Channel.value(file(referenceFastaValue))
     def prepared_reference
     def prepared_gridss_blacklist = null
@@ -272,8 +263,7 @@ workflow {
     //  Create single VCF file for each sample
     TUMOUR_CONSENSUS_VCF(TUMOR_FORMATTED)
 
-    // Call consensus SVs, requiring agreement from at least consensusMinSupport of the enabled callers;
-    // also write one VCF per support level from 2 up to the number of enabled callers
-    TUMOUR_CONSENSUS_CALL(TUMOUR_CONSENSUS_VCF.out.id, TUMOUR_CONSENSUS_VCF.out.consensus_vcf, consensusMinSupport, enabledCallerCount)
+    // Write one consensus VCF per support level, from 2 up to the number of enabled callers
+    TUMOUR_CONSENSUS_CALL(TUMOUR_CONSENSUS_VCF.out.id, TUMOUR_CONSENSUS_VCF.out.consensus_vcf, enabledCallerCount)
 
 }

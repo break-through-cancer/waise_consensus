@@ -36,9 +36,3 @@ run_lumpy: true
 run_svaba: true
 run_delly: true
 run_gridss: true
-
-# --- Consensus calling ----------------------------------------------------
-# Minimum number of enabled callers that must agree on an SV to keep it.
-# Leave unset/null to require every enabled caller (n/n). Must be at least
-# 2, and must not exceed the number of enabled callers above.
-consensus_min_support: null

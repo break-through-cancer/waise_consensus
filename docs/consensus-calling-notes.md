@@ -35,7 +35,7 @@ First, it builds a caller-specific normal panel. For each caller, all normal VCF
 
 Second, each sample's tumor VCFs are filtered against those caller-specific normal panels, then the filtered VCFs from every *enabled* caller are merged into one Jasmine consensus VCF in `main.nf` and `modules/tumour_consensus.nf`. In that step, the inputs are one filtered VCF per enabled caller for a single case, so `SUPP` measures caller support rather than cohort frequency.
 
-Each of the five callers (Manta, LUMPY, SvABA, DELLY, GRIDSS) can be switched off via `--run_<caller> false`, and consensus calling requires at least 2 enabled callers. The final tumor consensus filter keeps `INFO/SUPP >= consensus_min_support` in `modules/tumour_consensus.nf`, where `consensus_min_support` defaults to the number of enabled callers (an "all enabled callers agree" rule) and can be lowered via `--consensus_min_support` to require agreement from only a subset. The same step also writes `<id>_tumor_cons_min<k>.vcf` for every `k` from 2 up to the number of enabled callers, plus `<id>_consensus_levels.tsv` with the record count at each level.
+Each of the five callers (Manta, LUMPY, SvABA, DELLY, GRIDSS) can be switched off via `--run_<caller> false`, and consensus calling requires at least 2 enabled callers. The final tumor consensus step in `modules/tumour_consensus.nf` writes `<id>_tumor_cons_min<k>.vcf` (records with `INFO/SUPP >= k`) for every `k` from 2 up to the number of enabled callers, plus `<id>_consensus_levels.tsv` with the record count at each level. There is no single threshold parameter; choose the level downstream.
 
 ## SV Caller Snapshot
 

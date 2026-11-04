@@ -28,15 +28,6 @@ if enabled_count < 2:
         f"({enabled_callers}). Enable more callers before launching this analysis."
     )
 
-consensus_min_support = ds.params.get("consensus_min_support")
-if consensus_min_support is not None:
-    consensus_min_support = int(consensus_min_support)
-    if not (2 <= consensus_min_support <= enabled_count):
-        raise ValueError(
-            f"consensus_min_support must be between 2 and the number of enabled callers "
-            f"({enabled_count}); got {consensus_min_support}."
-        )
-
 ds.logger.info('checking ds.files')
 files = ds.files
 ds.logger.info(files.head())

@@ -36,11 +36,9 @@ process TUMOUR_CONSENSUS_CALL {
     input:
         val id
         path vcf
-        val min_support
         val n_callers
 
     output:
-        path "${id}_tumor_cons.vcf", emit: panel_vcf
         path "${id}_tumor_cons_min*.vcf", emit: level_vcfs
         path "${id}_consensus_levels.tsv", emit: level_summary
         val id, emit: id
@@ -49,8 +47,6 @@ process TUMOUR_CONSENSUS_CALL {
 
     """
     awk '/^##INFO=<ID=SUPP/ { sub("Type=String", "Type=Integer"); } { print }' ${vcf} > tmp.vcf0
-    bcftools filter -i "INFO/SUPP >= ${min_support}" tmp.vcf0 > ${id}_tumor_cons.vcf
-
     printf 'min_support\\tn_records\\n' > ${id}_consensus_levels.tsv
     for k in \$(seq 2 ${n_callers}); do
         bcftools filter -i "INFO/SUPP >= \$k" tmp.vcf0 > ${id}_tumor_cons_min\${k}.vcf
