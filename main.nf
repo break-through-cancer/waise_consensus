@@ -272,7 +272,8 @@ workflow {
     //  Create single VCF file for each sample
     TUMOUR_CONSENSUS_VCF(TUMOR_FORMATTED)
 
-    // Call consensus SVs, requiring agreement from at least consensusMinSupport of the enabled callers
-    TUMOUR_CONSENSUS_CALL(TUMOUR_CONSENSUS_VCF.out.id, TUMOUR_CONSENSUS_VCF.out.consensus_vcf, consensusMinSupport)
+    // Call consensus SVs, requiring agreement from at least consensusMinSupport of the enabled callers;
+    // also write one VCF per support level from 2 up to the number of enabled callers
+    TUMOUR_CONSENSUS_CALL(TUMOUR_CONSENSUS_VCF.out.id, TUMOUR_CONSENSUS_VCF.out.consensus_vcf, consensusMinSupport, enabledCallerCount)
 
 }
