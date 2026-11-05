@@ -19,6 +19,7 @@ include { TUMOUR_FILTER as GRIDSS_TUMOUR_FILTER } from './modules/tumour_filter.
 
 include { TUMOUR_CONSENSUS_VCF } from './modules/tumour_consensus.nf'
 include { TUMOUR_CONSENSUS_CALL } from './modules/tumour_consensus.nf'
+include { LUMPY_STRIP_STRANDS } from './modules/tumour_consensus.nf'
 include { PREP_REFERENCE; PREP_REFERENCE_WITH_INDEX; PREP_GRIDSS_ASSETS; PREP_GRIDSS_ASSETS_WITH_BLACKLIST; PREP_GRIDSS_PON_FROM_FILES; PREP_GRIDSS_PON_FROM_BUNDLE } from './modules/reference_prep.nf'
 include { MANTA } from './modules/manta.nf'
 include { LUMPY } from './modules/lumpy.nf'
@@ -203,7 +204,9 @@ workflow {
         def lumpy_normals = LUMPY.out.vcf_n.collect()
         def lumpy_panel = LUMPY_NORMAL_PANEL(lumpy_normals, 'lumpy')
         LUMPY_TUMOUR_FILTER(LUMPY.out.vcf_t, lumpy_panel, 'lumpy')
-        lumpy_filtered_vcf = LUMPY_TUMOUR_FILTER.out.filtered_vcf
+        // The published filtered VCF keeps LUMPY's STRANDS; only the copy entering the consensus merge drops it.
+        LUMPY_STRIP_STRANDS(LUMPY_TUMOUR_FILTER.out.filtered_vcf)
+        lumpy_filtered_vcf = LUMPY_STRIP_STRANDS.out.vcf
     } else {
         log.info "Skipping LUMPY (--run_lumpy=false)"
     }

@@ -37,6 +37,8 @@ Second, each sample's tumor VCFs are filtered against those caller-specific norm
 
 Each of the five callers (Manta, LUMPY, SvABA, DELLY, GRIDSS) can be switched off via `--run_<caller> false`, and consensus calling requires at least 2 enabled callers. The final tumor consensus step in `modules/tumour_consensus.nf` writes `<id>_tumor_cons_min<k>.vcf` (records with `INFO/SUPP >= k`) for every `k` from 2 up to the number of enabled callers, plus `<id>_consensus_levels.tsv` with the record count at each level. There is no single threshold parameter; choose the level downstream.
 
+Before the merge, `STRANDS` is removed from the LUMPY VCF (`LUMPY_STRIP_STRANDS`). Jasmine puts records in a merge group keyed by chromosome, type, and strand, and records with no `STRANDS` field get an empty strand. LUMPY writes `STRANDS` on deletions and duplications while the other callers do not, so without this step LUMPY calls never merge with another caller. Breakend records then take their strand from the ALT brackets, as for the other callers. The published `filtered/` LUMPY VCF is unchanged.
+
 ## SV Caller Snapshot
 
 | Caller | Core method | Practical strengths | Common caveats | Typical best fit |

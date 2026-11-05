@@ -24,6 +24,26 @@ process TUMOUR_CONSENSUS_VCF {
     """
 }
 
+process LUMPY_STRIP_STRANDS {
+    // Jasmine groups records by chromosome, type, and strand; LUMPY is the only caller that writes
+    // STRANDS on non-breakend records, so without this its calls never merge with the other callers.
+
+    label 'utility'
+
+    container 'quay.io/biocontainers/bcftools:1.21--h8b25389_0'
+
+    input:
+        tuple val(id), path(vcf)
+
+    output:
+        tuple val(id), path("${id}_lumpy_nostrands.vcf"), emit: vcf
+
+    script:
+    """
+    bcftools annotate -x INFO/STRANDS ${vcf} -o ${id}_lumpy_nostrands.vcf
+    """
+}
+
 process TUMOUR_CONSENSUS_CALL {
     // Merge VCF files into a single VCF for downstream processing
 
