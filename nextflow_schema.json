@@ -13,7 +13,7 @@
         "csv": {
           "type": "string",
           "format": "file-path",
-          "description": "Path to a comma-separated sample sheet with columns: id, tumor_bam, tumor_bai, normal_bam, normal_bai."
+          "description": "Path to a comma-separated sample sheet with columns: id, tumor_bam, tumor_bai, normal_bam, normal_bai. The "bam" columns also accept CRAM files and the "bai" columns CRAI indexes; the reference must be the FASTA the CRAMs were made with."
         },
         "publishDir": {
           "type": "string",

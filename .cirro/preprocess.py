@@ -49,8 +49,9 @@ if "bamType" in df.columns:
     has_recal = df.groupby("sample")["bamType"].transform(lambda s: (s == "recalibrated").any())
     df = df[~((df["bamType"] == "markduplicates") & has_recal)]
 
-# file type from path
-df["is_bai"] = df["file"].str.endswith(".bai")
+# file type from path: BAM+BAI or CRAM+CRAI. The "bam"/"bai" labels name the alignment and
+# its index; the callers read both formats given the reference FASTA.
+df["is_bai"] = df["file"].str.contains(r"\.(?:bai|crai)$", regex=True)
 df["filetype"] = df["is_bai"].map({True: "bai", False: "bam"})
 
 # case_id: prefer an explicit 'patient' column from the Cirro sample sheet so
