@@ -45,7 +45,7 @@ process DELLY_SPLIT {
         path delly_bcf
 
     output:
-        path "delly/${id}/*_normal.vcf", emit: vcf_n
+        tuple val(id), path("delly/${id}/*_normal.vcf"), emit: vcf_n
         tuple val(id), path("delly/${id}/*_tumor.vcf"), emit: vcf_t
 
     script:

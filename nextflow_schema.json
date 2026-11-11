@@ -13,7 +13,7 @@
         "csv": {
           "type": "string",
           "format": "file-path",
-          "description": "Path to a comma-separated sample sheet with columns: id, tumor_bam, tumor_bai, normal_bam, normal_bai. The "bam" columns also accept CRAM files and the "bai" columns CRAI indexes; the reference must be the FASTA the CRAMs were made with."
+          "description": "Path to a comma-separated sample sheet. For --entry full or call: id, tumor_bam, tumor_bai, normal_bam, normal_bai, and optionally normal_id; the bam columns also accept CRAM files and the bai columns CRAI indexes, and the reference must be the FASTA the CRAMs were made with. For --entry cohort: one row per VCF with id, normal_id, caller, role (tumor, normal, or panel), vcf."
         },
         "publishDir": {
           "type": "string",
@@ -123,6 +123,47 @@
           "description": "Run GRIDSS and include it in the consensus. Disabling this also skips all GRIDSS asset validation and preparation, so GRIDSS-specific inputs are not required."
         }
       }
+    },
+    "cohort_options": {
+      "title": "Entry and cohort filtering options",
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "string",
+          "default": "full",
+          "enum": [
+            "full",
+            "call",
+            "cohort"
+          ],
+          "description": "full runs the callers and then the cohort stage. call publishes the raw caller VCFs only. cohort runs only the cohort stage on VCFs listed in a long-format sheet."
+        },
+        "panel_min_support": {
+          "type": "integer",
+          "default": 2,
+          "minimum": 1,
+          "description": "Number of distinct normals that must carry an SV for it to enter a caller's panel."
+        },
+        "matched_normal_subtract": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also subtract each pair's own normal calls from its tumour calls."
+        },
+        "panel_subtract_any_overlap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Remove a tumour record on any overlap with the exclusion set instead of only when fully covered."
+        },
+        "normal_alt_only": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep only normal records where the normal carries the SV before they enter the panel or the matched-normal subtraction. By default this is the alt genotype (GT[0]). A normal VCF with no genotype calls passes through and is not used for matched-normal subtraction."
+        },
+        "normal_filters": {
+          "type": "object",
+          "description": "Per-caller bcftools expression that decides which normal records carry the SV, replacing the default genotype test. Example: {lumpy: 'FORMAT/SU[0]>=3'}. Set through a params file."
+        }
+      }
     }
   },
   "allOf": [
@@ -137,6 +178,9 @@
     },
     {
       "$ref": "#/definitions/caller_selection_options"
+    },
+    {
+      "$ref": "#/definitions/cohort_options"
     }
   ]
 }

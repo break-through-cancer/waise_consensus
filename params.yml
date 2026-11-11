@@ -14,8 +14,18 @@
 # back to the default in nextflow.config.
 
 # --- Input/output -----------------------------------------------------
-csv: "test.csv"               # required: sample sheet (id, tumor_bam, tumor_bai, normal_bam, normal_bai)
+csv: "test.csv"               # required: sample sheet. entry full/call: id, tumor_bam, tumor_bai, normal_bam, normal_bai[, normal_id]
+                              #           entry cohort: long format, one row per VCF: id, normal_id, caller, role, vcf
 # publishDir: "results"
+
+# --- Entry and cohort filtering ---------------------------------------------
+# entry: "full"                  # full | call | cohort
+# panel_min_support: 2           # distinct normals needed for a panel record
+# normal_alt_only: true          # keep only normal records where the normal carries the SV
+# normal_filters:                # per-caller bcftools expression, for normal VCFs without a genotype
+#   lumpy: 'FORMAT/SU[0]>=3'
+# matched_normal_subtract: true  # also subtract each pair's own normal calls
+# panel_subtract_any_overlap: false
 
 # --- Reference genome ---------------------------------------------------
 # genome_build: "hg38"          # hg38 | hg19 | other

@@ -12,7 +12,7 @@ process SVABA {
 
     output:
         path "svaba/${id}/", emit: outdir
-        path "svaba/${id}/*svaba.germline.sv.vcf", emit: vcf_n
+        tuple val(id), path("svaba/${id}/*svaba.germline.sv.vcf"), emit: vcf_n
         tuple val(id), path("svaba/${id}/*svaba.unfiltered.somatic.sv.vcf"), emit: vcf_t
 
     script:

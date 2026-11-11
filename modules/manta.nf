@@ -12,7 +12,7 @@ process MANTA {
 
     output:
         path "manta/${id}/", emit: outdir
-        path "manta/${id}/results/variants/${id}*diploidSV.vcf", emit: vcf_n
+        tuple val(id), path("manta/${id}/results/variants/${id}*diploidSV.vcf"), emit: vcf_n
         tuple val(id), path("manta/${id}/results/variants/${id}*somaticSV.vcf"), emit: vcf_t
 
     script:

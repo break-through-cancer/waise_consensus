@@ -327,7 +327,7 @@ process GRIDSS_NORMAL_VCF {
         tuple val(id), path(gridss_joint_vcf)
 
     output:
-        path "gridsspl/${id}/${id}_normal.vcf", emit: vcf_n
+        tuple val(id), path("gridsspl/${id}/${id}_normal.vcf"), emit: vcf_n
 
     script:
     def gridsspl_outdir = "gridsspl/${id}"

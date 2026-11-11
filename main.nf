@@ -5,21 +5,7 @@
 
 nextflow.enable.dsl=2
 
-include { JASMINE_PANEL as MANTA_NORMAL_PANEL } from './modules/jasmine_panel.nf'
-include { JASMINE_PANEL as LUMPY_NORMAL_PANEL } from './modules/jasmine_panel.nf'
-include { JASMINE_PANEL as SVABA_NORMAL_PANEL } from './modules/jasmine_panel.nf'
-include { JASMINE_PANEL as DELLY_NORMAL_PANEL } from './modules/jasmine_panel.nf'
-include { JASMINE_PANEL as GRIDSS_NORMAL_PANEL } from './modules/jasmine_panel.nf'
-
-include { TUMOUR_FILTER as MANTA_TUMOUR_FILTER } from './modules/tumour_filter.nf'
-include { TUMOUR_FILTER as LUMPY_TUMOUR_FILTER } from './modules/tumour_filter.nf'
-include { TUMOUR_FILTER as SVABA_TUMOUR_FILTER } from './modules/tumour_filter.nf'
-include { TUMOUR_FILTER as DELLY_TUMOUR_FILTER } from './modules/tumour_filter.nf'
-include { TUMOUR_FILTER as GRIDSS_TUMOUR_FILTER } from './modules/tumour_filter.nf'
-
-include { TUMOUR_CONSENSUS_VCF } from './modules/tumour_consensus.nf'
-include { TUMOUR_CONSENSUS_CALL } from './modules/tumour_consensus.nf'
-include { LUMPY_STRIP_STRANDS } from './modules/tumour_consensus.nf'
+include { SV_COHORT } from './modules/cohort.nf'
 include { PREP_REFERENCE; PREP_REFERENCE_WITH_INDEX; PREP_GRIDSS_ASSETS; PREP_GRIDSS_ASSETS_WITH_BLACKLIST; PREP_GRIDSS_PON_FROM_FILES; PREP_GRIDSS_PON_FROM_BUNDLE } from './modules/reference_prep.nf'
 include { MANTA } from './modules/manta.nf'
 include { LUMPY } from './modules/lumpy.nf'
@@ -41,15 +27,21 @@ workflow {
     def referenceFastaValue = params.reference_fasta ?: buildDefaults.reference_fasta
     def referenceIndexValue = params.reference_index
 
+    // full: call, then filter and merge; call: raw caller VCFs only; cohort: filter and merge VCFs from a long-format sheet
+    def entry = (params.entry ?: 'full').toString().toLowerCase()
+    if (!['full', 'call', 'cohort'].contains(entry)) {
+        error "Unsupported --entry '${params.entry}'. Use full, call, or cohort."
+    }
+
     if (!csvValue) {
         error "Missing required parameter --csv. Provide a sample sheet or use -profile test."
     }
 
-    if (!referenceFastaValue) {
+    if (entry != 'cohort' && !referenceFastaValue) {
         error "Missing required reference FASTA. Set --genome_build hg38/hg19 or provide --reference_fasta."
     }
 
-    if (referenceFastaValue.toString().endsWith('.gz') && referenceIndexValue) {
+    if (entry != 'cohort' && referenceFastaValue.toString().endsWith('.gz') && referenceIndexValue) {
         log.warn "Ignoring --reference_index for compressed FASTA inputs because the pipeline rebuilds the .fai after decompression."
     }
 
@@ -57,11 +49,11 @@ workflow {
         error "Parameter --csv points to a missing local path: ${csvValue}"
     }
 
-    if (!(referenceFastaValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(referenceFastaValue.toString()).exists()) {
+    if (entry != 'cohort' && !(referenceFastaValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(referenceFastaValue.toString()).exists()) {
         error "Parameter --reference_fasta points to a missing local path: ${referenceFastaValue}"
     }
 
-    if (referenceIndexValue && !(referenceIndexValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(referenceIndexValue.toString()).exists()) {
+    if (entry != 'cohort' && referenceIndexValue && !(referenceIndexValue.toString() ==~ /^(https?|ftp|s3):\/\/.+/) && !new File(referenceIndexValue.toString()).exists()) {
         error "Parameter --reference_index points to a missing local path: ${referenceIndexValue}"
     }
 
@@ -75,10 +67,14 @@ workflow {
     def runGridss = params.run_gridss.toString().toBoolean()
     def enabledCallerCount = [runManta, runLumpy, runSvaba, runDelly, runGridss].count { it }
 
-    if (enabledCallerCount < 2) {
+    if (entry == 'full' && enabledCallerCount < 2) {
         error "Consensus calling requires at least 2 enabled SV callers (got ${enabledCallerCount}). Enable more via --run_manta/--run_lumpy/--run_svaba/--run_delly/--run_gridss."
     }
 
+
+    def rows = null
+
+    if (entry != 'cohort') {
     def reference_fasta_source = Channel.value(file(referenceFastaValue))
     def prepared_reference
     def prepared_gridss_blacklist = null
@@ -186,55 +182,50 @@ workflow {
                 file(row.normal_bai)
                 ) }
 
-    // Run callers on BAM, each gated by its --run_<caller> toggle
-    def manta_filtered_vcf = null
+    // The normal's identity decides how many distinct normals the panel sees. It defaults to the
+    // normal BAM file name, so pairs that share a normal BAM share a normal.
+    def pair_normals = Channel
+            .fromPath(csvValue)
+            .splitCsv(header: true, sep: ',', strip: true)
+            .map { row -> tuple(row.id, (row.normal_id ?: file(row.normal_bam).name.replaceFirst(/\.(bam|cram)$/, '')).toString()) }
+
+    // Run callers on BAM, each gated by its --run_<caller> toggle. Each caller adds its tumour and
+    // normal VCFs to the rows passed to the cohort stage as (id, caller, role, vcf).
+    def caller_rows = []
+
     if (runManta) {
         MANTA(bam_channel, prepared_reference)
-        def manta_normals = MANTA.out.vcf_n.collect()
-        def manta_panel = MANTA_NORMAL_PANEL(manta_normals, 'manta')
-        MANTA_TUMOUR_FILTER(MANTA.out.vcf_t, manta_panel, 'manta')
-        manta_filtered_vcf = MANTA_TUMOUR_FILTER.out.filtered_vcf
+        caller_rows << MANTA.out.vcf_t.map { id, vcf -> tuple(id, 'manta', 'tumor', vcf) }
+        caller_rows << MANTA.out.vcf_n.map { id, vcf -> tuple(id, 'manta', 'normal', vcf) }
     } else {
         log.info "Skipping Manta (--run_manta=false)"
     }
 
-    def lumpy_filtered_vcf = null
     if (runLumpy) {
         LUMPY(bam_channel, prepared_reference)
-        def lumpy_normals = LUMPY.out.vcf_n.collect()
-        def lumpy_panel = LUMPY_NORMAL_PANEL(lumpy_normals, 'lumpy')
-        LUMPY_TUMOUR_FILTER(LUMPY.out.vcf_t, lumpy_panel, 'lumpy')
-        // The published filtered VCF keeps LUMPY's STRANDS; only the copy entering the consensus merge drops it.
-        LUMPY_STRIP_STRANDS(LUMPY_TUMOUR_FILTER.out.filtered_vcf)
-        lumpy_filtered_vcf = LUMPY_STRIP_STRANDS.out.vcf
+        caller_rows << LUMPY.out.vcf_t.map { id, vcf -> tuple(id, 'lumpy', 'tumor', vcf) }
+        caller_rows << LUMPY.out.vcf_n.map { id, vcf -> tuple(id, 'lumpy', 'normal', vcf) }
     } else {
         log.info "Skipping LUMPY (--run_lumpy=false)"
     }
 
-    def svaba_filtered_vcf = null
     if (runSvaba) {
         SVABA(bam_channel, prepared_reference)
-        def svaba_normals = SVABA.out.vcf_n.collect()
-        def svaba_panel = SVABA_NORMAL_PANEL(svaba_normals, 'svaba')
-        SVABA_TUMOUR_FILTER(SVABA.out.vcf_t, svaba_panel, 'svaba')
-        svaba_filtered_vcf = SVABA_TUMOUR_FILTER.out.filtered_vcf
+        caller_rows << SVABA.out.vcf_t.map { id, vcf -> tuple(id, 'svaba', 'tumor', vcf) }
+        caller_rows << SVABA.out.vcf_n.map { id, vcf -> tuple(id, 'svaba', 'normal', vcf) }
     } else {
         log.info "Skipping SvABA (--run_svaba=false)"
     }
 
-    def delly_filtered_vcf = null
     if (runDelly) {
         DELLY(bam_channel, prepared_reference)
         DELLY_SPLIT(DELLY.out.id, DELLY.out.bcf)
-        def delly_normals = DELLY_SPLIT.out.vcf_n.collect()
-        def delly_panel = DELLY_NORMAL_PANEL(delly_normals, 'delly')
-        DELLY_TUMOUR_FILTER(DELLY_SPLIT.out.vcf_t, delly_panel, 'delly')
-        delly_filtered_vcf = DELLY_TUMOUR_FILTER.out.filtered_vcf
+        caller_rows << DELLY_SPLIT.out.vcf_t.map { id, vcf -> tuple(id, 'delly', 'tumor', vcf) }
+        caller_rows << DELLY_SPLIT.out.vcf_n.map { id, vcf -> tuple(id, 'delly', 'normal', vcf) }
     } else {
         log.info "Skipping DELLY (--run_delly=false)"
     }
 
-    def gridss_filtered_vcf = null
     if (runGridss) {
         GRIDSS(bam_channel, prepared_reference, prepared_gridss_blacklist, prepared_gridss_properties)
         def gridss_filtered_joint_vcf
@@ -247,26 +238,73 @@ workflow {
         }
         GRIDSS_NORMAL_VCF(GRIDSS.out.joint_vcf)
         GRIDSS_TUMOUR_VCF(gridss_filtered_joint_vcf)
-
-        def gridss_normals = GRIDSS_NORMAL_VCF.out.vcf_n.collect()
-        def gridss_panel = GRIDSS_NORMAL_PANEL(gridss_normals, 'gridss')
-        GRIDSS_TUMOUR_FILTER(GRIDSS_TUMOUR_VCF.out.vcf_t, gridss_panel, 'gridss')
-        gridss_filtered_vcf = GRIDSS_TUMOUR_FILTER.out.filtered_vcf
+        caller_rows << GRIDSS_TUMOUR_VCF.out.vcf_t.map { id, vcf -> tuple(id, 'gridss', 'tumor', vcf) }
+        caller_rows << GRIDSS_NORMAL_VCF.out.vcf_n.map { id, vcf -> tuple(id, 'gridss', 'normal', vcf) }
     } else {
         log.info "Skipping GRIDSS (--run_gridss=false)"
     }
 
-    // Combine filtered VCF channels from every enabled caller, by Sample ID
-    def filteredCallerChannels = [manta_filtered_vcf, lumpy_filtered_vcf, svaba_filtered_vcf, delly_filtered_vcf, gridss_filtered_vcf].findAll { it != null }
-    def TUMOR_COMBINED = filteredCallerChannels.inject { a, b -> a.combine(b, by: 0) }
+    if (entry == 'full') {
+        rows = caller_rows
+            .inject { a, b -> a.mix(b) }
+            .combine(pair_normals, by: 0)
+            .map { id, caller, role, vcf, nid -> tuple(id, nid, caller, role, vcf) }
+    }
+    }
 
-    // Aggregate VCF files for each sample
-    //  Create channel with (val(id), [path(vcf), path(vcf), ...])
-    TUMOR_FORMATTED = TUMOR_COMBINED.map { v -> tuple(v[0], v.subList(1, v.size())) } // `*vcfs` captures all elements except the first
-    //  Create single VCF file for each sample
-    TUMOUR_CONSENSUS_VCF(TUMOR_FORMATTED)
+    if (entry == 'cohort') {
+        // Long-format sheet, one row per VCF: id, normal_id, caller, role, vcf
+        def sheet = file(csvValue).splitCsv(header: true, sep: ',', strip: true)
+        def required = ['id', 'caller', 'role', 'vcf']
+        def missing = required.findAll { !(sheet ? sheet[0].containsKey(it) : true) }
+        if (missing) {
+            error "Cohort sheet ${csvValue} is missing required columns: ${missing.join(', ')}. Expected id, normal_id, caller, role, vcf."
+        }
+        if (!sheet) {
+            error "Cohort sheet ${csvValue} has no rows."
+        }
 
-    // Write one consensus VCF per support level, from 2 up to the number of enabled callers
-    TUMOUR_CONSENSUS_CALL(TUMOUR_CONSENSUS_VCF.out.id, TUMOUR_CONSENSUS_VCF.out.consensus_vcf, enabledCallerCount)
+        def seen = [:]
+        sheet.eachWithIndex { row, i ->
+            def where = "row ${i + 2} of ${csvValue}"
+            def role = (row.role ?: '').toString().toLowerCase()
+            def caller = (row.caller ?: '').toString()
+            if (!['tumor', 'normal', 'panel'].contains(role)) {
+                error "Invalid role '${row.role}' in ${where}. Use tumor, normal, or panel."
+            }
+            if (!(caller ==~ /^[A-Za-z0-9-]+$/)) {
+                error "Invalid caller '${row.caller}' in ${where}. Use letters, digits, and hyphens only."
+            }
+            if (!row.vcf) {
+                error "Missing vcf in ${where}."
+            }
+            if (role != 'panel' && !row.id) {
+                error "Missing id in ${where}."
+            }
+            if (role == 'normal' && !row.normal_id) {
+                error "Missing normal_id in ${where}. Normal rows need an identifier for the normal sample so a normal shared by several pairs is counted once."
+            }
+            def key = [role, row.id ?: '', caller]
+            if (role != 'panel' && seen.containsKey(key)) {
+                error "Duplicate ${role} row for id '${row.id}' and caller '${caller}' in ${where}."
+            }
+            if (role == 'panel' && seen.containsKey([role, '', caller])) {
+                error "More than one panel row for caller '${caller}' in ${where}."
+            }
+            seen[role == 'panel' ? [role, '', caller] : key] = true
+        }
 
+        def tumourCallers = sheet.findAll { it.role.toString().toLowerCase() == 'tumor' }.collect { it.caller.toString() }.unique()
+        if (tumourCallers.size() < 2) {
+            error "Consensus calling needs tumor rows from at least 2 callers (found ${tumourCallers.size()}: ${tumourCallers})."
+        }
+
+        rows = Channel.fromList(sheet.collect { row ->
+            tuple((row.id ?: '').toString(), (row.normal_id ?: '').toString(), row.caller.toString(), row.role.toString().toLowerCase(), file(row.vcf))
+        })
+    }
+
+    if (entry != 'call') {
+        SV_COHORT(rows)
+    }
 }

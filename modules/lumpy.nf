@@ -12,7 +12,7 @@ process LUMPY {
 
     output:
         path "lumpy/${id}/", emit: outdir
-        path "lumpy/${id}/*_normal.vcf", emit: vcf_n
+        tuple val(id), path("lumpy/${id}/*_normal.vcf"), emit: vcf_n
         tuple val(id), path("lumpy/${id}/*_tumor.vcf"), emit: vcf_t
 
     script:
