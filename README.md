@@ -31,9 +31,63 @@ nasa3,t3.bam,t1.bam.bai,n3.bam,n1.bam.bai
 > [!NOTE]
 > BAM index files are required for Nextflow to include them in the working directory.
 
+## Entry Modes
+
+`--entry` selects how much of the pipeline runs:
+
+| Entry | What runs | Input sheet |
+| --- | --- | --- |
+| `full` (default) | The callers, then the cohort stage | BAM sheet (above) |
+| `call` | The callers only, publishing each caller's raw tumor and normal VCFs | BAM sheet |
+| `cohort` | The cohort stage only, on VCFs that already exist | Long-format sheet (below) |
+
+Calling is independent for each pair: a pair's caller output does not depend on which other pairs are in the run. The normal panel is the only step that looks across pairs, so it is the part that can be rerun on its own with `--entry cohort`.
+
+The BAM sheet accepts an optional `normal_id` column naming the normal sample. It defaults to the normal BAM file name, so pairs that share a normal BAM share a normal.
+
+## Cohort Stage
+
+The cohort stage builds a normal panel for each caller, filters each pair's tumor calls, and merges the callers into a consensus. It takes a long-format sheet with one row per VCF:
+
+```
+id,normal_id,caller,role,vcf
+pair1,patientA,manta,tumor,pair1_somaticSV.vcf
+pair1,patientA,manta,normal,pair1_diploidSV.vcf
+pair1,patientA,delly,tumor,pair1_delly_tumor.vcf
+pair1,patientA,delly,normal,pair1_delly_normal.vcf
+pair2,patientA,manta,tumor,pair2_somaticSV.vcf
+pair2,patientA,manta,normal,pair2_diploidSV.vcf
+,,manta,panel,frozen_manta_panel.vcf
+```
+
+- `caller` is any label (letters, digits, and hyphens). The five built-in callers are not special; VCFs from other callers can be added as more `caller` values, and the consensus uses every caller present. The caller order in `SUPP_VEC` is alphabetical and is written to `somatic/<id>/<id>_consensus_callers.tsv`.
+- `role` is `tumor` (the pair's somatic calls), `normal` (the pair's normal calls), or `panel` (a frozen panel for one caller, used instead of building one).
+- `normal_id` is required on normal rows. A normal that appears in several pairs is counted once in the panel.
+- A caller without normal rows and without a frozen panel is not filtered against a panel.
+- At least two callers need tumor rows.
+
+Inputs must use the same reference build and contig names. Each caller's VCFs should come from the same caller settings, since a panel built from one caller's normals only makes sense for that caller.
+
+## Normal Panel and Matched Normal
+
+Each caller's panel keeps the SVs found in at least `--panel_min_support` distinct normals (default 2). The panel is merged with Jasmine from one VCF per distinct normal, so several tumors from one patient do not make that patient's normal calls look recurrent. With fewer distinct normals than the threshold the panel is empty.
+
+Normal records enter the panel and the subtraction only when the normal carries the SV (`--normal_alt_only true`). By default that means an alt genotype (`GT[0]`). Not every caller records it: the LUMPY and GRIDSS normal VCFs from this pipeline leave the genotype empty and list every site genotyped, so their normal VCFs cannot be filtered this way and would otherwise remove every tumor call. For such a VCF the file is used as it is in the panel, matched-normal subtraction is skipped for that caller, and the task log says so. To decide with the caller's own evidence instead, set `normal_filters` in a params file, for example:
+
+```yaml
+normal_filters:
+  lumpy: 'FORMAT/SU[0]>=3'
+```
+
+The expression is a `bcftools view -i` expression and cannot contain single quotes. Normal VCFs should hold a single sample.
+
+By default each pair's own normal calls are also subtracted from its tumor calls (`--matched_normal_subtract true`). Normal calls that enter this step come from the joint tumor-normal run for that pair.
+
+Tumor records are removed when they are fully covered by the panel and matched-normal intervals, as `bedtools subtract` does. `bedtools subtract` writes a record once for each fragment that remains, so identical lines are collapsed to a single copy. `--panel_subtract_any_overlap true` removes a record on any overlap instead (`bedtools subtract -A`).
+
 ## Tumour Filter Safeguards
 
-The tumour-panel subtraction step now drops malformed VCF records whose primary `POS` is outside the allowed contig bounds before running `bedtools`. This covers both `POS <= 0` and records whose `POS` exceeds a declared `##contig` length, preventing caller-specific edge cases from aborting tumour filtering.
+The tumour filter drops malformed VCF records whose primary `POS` is outside the allowed contig bounds before running `bedtools`. This covers both `POS <= 0` and records whose `POS` exceeds a declared `##contig` length, preventing caller-specific edge cases from aborting tumour filtering.
 
 ## Reference Selection
 
