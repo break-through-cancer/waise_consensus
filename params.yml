@@ -24,6 +24,8 @@ csv: "test.csv"               # required: sample sheet. entry full/call: id, tum
 # normal_alt_only: true          # keep only normal records where the normal carries the SV
 # normal_filters:                # per-caller bcftools expression, for normal VCFs without a genotype
 #   lumpy: 'FORMAT/SU[0]>=3'
+# delly_filter: true             # delly filter -f somatic on the DELLY BCF
+# delly_filter_args: ''          # extra options, e.g. '-a 0.1 -p'
 # matched_normal_subtract: true  # also subtract each pair's own normal calls
 # panel_subtract_any_overlap: false
 

@@ -85,6 +85,12 @@
         "default": 2,
         "minimum": 1
       },
+      "delly_filter": {
+        "title": "DELLY Somatic Filter",
+        "description": "Run delly filter -f somatic on the DELLY BCF instead of using the split tumor VCF (cohort entry needs the DELLY BCF in the selected datasets)",
+        "type": "boolean",
+        "default": true
+      },
       "matched_normal_subtract": {
         "title": "Subtract Matched Normal",
         "description": "Also remove tumor calls that overlap the pair's own normal calls",

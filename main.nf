@@ -220,7 +220,12 @@ workflow {
     if (runDelly) {
         DELLY(bam_channel, prepared_reference)
         DELLY_SPLIT(DELLY.out.id, DELLY.out.bcf)
-        caller_rows << DELLY_SPLIT.out.vcf_t.map { id, vcf -> tuple(id, 'delly', 'tumor', vcf) }
+        if (params.delly_filter.toString().toBoolean()) {
+            // delly filter replaces the split tumour VCF; the cohort stage runs it on the joint BCF
+            caller_rows << DELLY.out.bcf_t.map { id, bcf -> tuple(id, 'delly', 'bcf', bcf) }
+        } else {
+            caller_rows << DELLY_SPLIT.out.vcf_t.map { id, vcf -> tuple(id, 'delly', 'tumor', vcf) }
+        }
         caller_rows << DELLY_SPLIT.out.vcf_n.map { id, vcf -> tuple(id, 'delly', 'normal', vcf) }
     } else {
         log.info "Skipping DELLY (--run_delly=false)"
@@ -269,14 +274,17 @@ workflow {
             def where = "row ${i + 2} of ${csvValue}"
             def role = (row.role ?: '').toString().toLowerCase()
             def caller = (row.caller ?: '').toString()
-            if (!['tumor', 'normal', 'panel'].contains(role)) {
-                error "Invalid role '${row.role}' in ${where}. Use tumor, normal, or panel."
+            if (!['tumor', 'normal', 'panel', 'bcf'].contains(role)) {
+                error "Invalid role '${row.role}' in ${where}. Use tumor, normal, panel, or bcf."
             }
             if (!(caller ==~ /^[A-Za-z0-9-]+$/)) {
                 error "Invalid caller '${row.caller}' in ${where}. Use letters, digits, and hyphens only."
             }
             if (!row.vcf) {
                 error "Missing vcf in ${where}."
+            }
+            if (role == 'bcf' && caller != 'delly') {
+                error "Role bcf is only for the DELLY joint BCF; got caller '${caller}' in ${where}."
             }
             if (role != 'panel' && !row.id) {
                 error "Missing id in ${where}."
@@ -294,7 +302,16 @@ workflow {
             seen[role == 'panel' ? [role, '', caller] : key] = true
         }
 
-        def tumourCallers = sheet.findAll { it.role.toString().toLowerCase() == 'tumor' }.collect { it.caller.toString() }.unique()
+        // With delly_filter on, a DELLY BCF row replaces that pair's DELLY tumour VCF row
+        def useDellyFilter = params.delly_filter.toString().toBoolean()
+        def bcfIds = sheet.findAll { it.role.toString().toLowerCase() == 'bcf' }.collect { it.id.toString() } as Set
+        sheet = sheet.findAll { row ->
+            def role = row.role.toString().toLowerCase()
+            if (role == 'bcf') { return useDellyFilter }
+            return !(useDellyFilter && role == 'tumor' && row.caller.toString() == 'delly' && bcfIds.contains(row.id.toString()))
+        }
+
+        def tumourCallers = sheet.findAll { it.role.toString().toLowerCase() in ['tumor', 'bcf'] }.collect { it.caller.toString() }.unique()
         if (tumourCallers.size() < 2) {
             error "Consensus calling needs tumor rows from at least 2 callers (found ${tumourCallers.size()}: ${tumourCallers})."
         }

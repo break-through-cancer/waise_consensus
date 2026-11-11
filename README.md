@@ -61,7 +61,7 @@ pair2,patientA,manta,normal,pair2_diploidSV.vcf
 ```
 
 - `caller` is any label (letters, digits, and hyphens). The five built-in callers are not special; VCFs from other callers can be added as more `caller` values, and the consensus uses every caller present. The caller order in `SUPP_VEC` is alphabetical and is written to `somatic/<id>/<id>_consensus_callers.tsv`.
-- `role` is `tumor` (the pair's somatic calls), `normal` (the pair's normal calls), or `panel` (a frozen panel for one caller, used instead of building one).
+- `role` is `tumor` (the pair's somatic calls), `normal` (the pair's normal calls), `panel` (a frozen panel for one caller, used instead of building one), or `bcf` (the DELLY joint BCF, caller `delly` only; see below).
 - `normal_id` is required on normal rows. A normal that appears in several pairs is counted once in the panel.
 - A caller without normal rows and without a frozen panel is not filtered against a panel.
 - At least two callers need tumor rows.
@@ -84,6 +84,16 @@ The expression is a `bcftools view -i` expression and cannot contain single quot
 By default each pair's own normal calls are also subtracted from its tumor calls (`--matched_normal_subtract true`). Normal calls that enter this step come from the joint tumor-normal run for that pair.
 
 Tumor records are removed when they are fully covered by the panel and matched-normal intervals, as `bedtools subtract` does. `bedtools subtract` writes a record once for each fragment that remains, so identical lines are collapsed to a single copy. `--panel_subtract_any_overlap true` removes a record on any overlap instead (`bedtools subtract -A`).
+
+## DELLY Somatic Filter
+
+Waise et al. identified somatic DELLY calls with `delly filter` instead of subtracting the germline calls. With `--delly_filter true` (default) the cohort stage runs `delly filter -f somatic` on the DELLY joint BCF, a `bcf` row in the sheet, in place of that pair's DELLY tumor VCF. The tumor is the first sample in the BCF, as in the calling step. DELLY's defaults apply: a minimum alt fraction of 0.2 and coverage of 10 in the tumor, and no alt support in the control. Other options, such as `-a 0.1` or `-p` for PASS only, go in `--delly_filter_args`. The matched-normal subtraction is not applied to these calls, because the filter already tests the control. The panel still is. The BCF needs no index; one is built. With `--delly_filter false` the `bcf` row is ignored and the `tumor` row is used.
+
+On one tumor-normal pair the DELLY filter kept 595 of 67,265 records, where the split tumor VCF had 27,910 and the matched-normal subtraction left 615. Only 66 records were in both sets, so the two filters are not interchangeable.
+
+## Merge Inputs
+
+Jasmine writes inconsistent records when its input VCFs have different numbers of samples, and `bcftools` then stops reading the merged VCF part way through. The somatic Manta and SvABA VCFs have two samples, the others one. Every VCF is therefore reduced to its first sample before the merge, and the consensus step stops with an error if `bcftools` cannot parse every record of the merged VCF.
 
 ## Tumour Filter Safeguards
 

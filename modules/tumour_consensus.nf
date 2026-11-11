@@ -17,7 +17,15 @@ process NORMALIZE_VCF {
 
     script:
     """
-    bcftools annotate -x INFO/STRANDS input.vcf -o ${id}_${caller}_consensus_input.vcf
+    # Jasmine writes inconsistent records when its inputs have different numbers of samples (the
+    # somatic Manta and SvABA VCFs have two), so every input is reduced to its first sample. The
+    # genotype columns play no part in the merge.
+    sample=`bcftools query -l input.vcf | head -n 1`
+    if [ -n "\$sample" ]; then
+        bcftools view --no-update -s "\$sample" input.vcf | bcftools annotate -x INFO/STRANDS -o ${id}_${caller}_consensus_input.vcf
+    else
+        bcftools annotate -x INFO/STRANDS input.vcf -o ${id}_${caller}_consensus_input.vcf
+    fi
     """
 }
 
@@ -87,6 +95,15 @@ process TUMOUR_CONSENSUS_CALL {
     """
     mkdir -p somatic/${id}
     awk '/^##INFO=<ID=SUPP/ { sub("Type=String", "Type=Integer"); } { print }' ${vcf} > tmp.vcf0
+
+    # bcftools stops quietly at a malformed record, which would leave every level empty
+    n_records=\$(grep -vc '^#' tmp.vcf0 || true)
+    n_parsed=\$(bcftools view -H tmp.vcf0 | wc -l)
+    if [ "\$n_records" -ne "\$n_parsed" ]; then
+        echo "bcftools parsed \$n_parsed of \$n_records records in the merged VCF" >&2
+        exit 1
+    fi
+
     printf 'min_support\\tn_records\\n' > somatic/${id}/${id}_consensus_levels.tsv
     for k in \$(seq 2 ${n_callers}); do
         bcftools filter -i "INFO/SUPP >= \$k" tmp.vcf0 > somatic/${id}/${id}_tumor_cons_min\${k}.vcf

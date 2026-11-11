@@ -11,5 +11,6 @@
   "run_gridss": "$.dataset.params.run_gridss",
   "entry": "$.dataset.params.entry",
   "panel_min_support": "$.dataset.params.panel_min_support",
-  "matched_normal_subtract": "$.dataset.params.matched_normal_subtract"
+  "matched_normal_subtract": "$.dataset.params.matched_normal_subtract",
+  "delly_filter": "$.dataset.params.delly_filter"
 }

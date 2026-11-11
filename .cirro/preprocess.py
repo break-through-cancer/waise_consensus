@@ -25,6 +25,7 @@ _VCF_PATTERNS = [
     ("manta", "normal", re.compile(r"/manta/(?P<id>[^/]+)/results/variants/[^/]*_diploidSV\.vcf$")),
     ("svaba", "tumor", re.compile(r"/svaba/(?P<id>[^/]+)/[^/]*svaba\.unfiltered\.somatic\.sv\.vcf$")),
     ("svaba", "normal", re.compile(r"/svaba/(?P<id>[^/]+)/[^/]*svaba\.germline\.sv\.vcf$")),
+    ("delly", "bcf", re.compile(r"/delly/(?P<id>[^/]+)/[^/]*_delly\.bcf$")),
     ("delly", "tumor", re.compile(r"/delly/(?P<id>[^/]+)/[^/]*_tumor\.vcf$")),
     ("delly", "normal", re.compile(r"/delly/(?P<id>[^/]+)/[^/]*_normal\.vcf$")),
     ("lumpy", "tumor", re.compile(r"/lumpy/(?P<id>[^/]+)/[^/]*_tumor\.vcf$")),

@@ -7,6 +7,7 @@
 
 include { PANEL_MERGE; PANEL_FILTER } from './jasmine_panel.nf'
 include { TUMOUR_FILTER; NORMAL_ALT_ONLY } from './tumour_filter.nf'
+include { DELLY_SOMATIC_PREP; DELLY_FILTER; DELLY_TO_VCF } from './delly.nf'
 include { NORMALIZE_VCF; TUMOUR_CONSENSUS_VCF; TUMOUR_CONSENSUS_CALL } from './tumour_consensus.nf'
 
 workflow SV_COHORT {
@@ -19,7 +20,14 @@ workflow SV_COHORT {
     def min_support = params.panel_min_support as int
     def use_matched = params.matched_normal_subtract.toString().toBoolean()
 
-    tumours = rows.filter { it[3] == 'tumor' }.map { id, nid, caller, role, vcf -> tuple(id, caller, vcf) }
+    // kind T: a tumour VCF. kind S: already filtered against the normal by the caller's own somatic
+    // filter, so the matched-normal subtraction is not applied to it.
+    plain_tumours = rows.filter { it[3] == 'tumor' }.map { id, nid, caller, role, vcf -> tuple(id, caller, vcf, 'T') }
+
+    DELLY_SOMATIC_PREP(rows.filter { it[3] == 'bcf' }.map { id, nid, caller, role, vcf -> tuple(id, vcf) })
+    DELLY_FILTER(DELLY_SOMATIC_PREP.out.prepared)
+    DELLY_TO_VCF(DELLY_FILTER.out.somatic)
+    tumours = plain_tumours.mix(DELLY_TO_VCF.out.vcf.map { id, caller, vcf -> tuple(id, caller, vcf, 'S') })
     normal_rows = rows.filter { it[3] == 'normal' }.map { id, nid, caller, role, vcf -> tuple(id, nid, caller, vcf) }
     // usable is false when a normal VCF has no way to tell whether the normal carries each SV
     def normals = normal_rows.map { id, nid, caller, vcf -> tuple(id, nid, caller, vcf, true) }
@@ -57,9 +65,9 @@ workflow SV_COHORT {
     // Pair each tumour VCF with its caller's panel and the pair's own normal VCF
     tumour_keyed = tumours
         .combine(panels)
-        .map { id, caller, vcf, panel_list ->
+        .map { id, caller, vcf, kind, panel_list ->
             def panel = panel_list.find { it[0] == caller }
-            tuple([id, caller], 'T', vcf, panel ? panel[1] : no_vcf, panel ? true : false)
+            tuple([id, caller], kind, vcf, panel ? panel[1] : no_vcf, panel ? true : false)
         }
     normal_keyed = normals
         .map { id, nid, caller, vcf, usable -> tuple([id, caller], 'N', vcf, no_vcf, usable) }
@@ -67,11 +75,11 @@ workflow SV_COHORT {
     to_filter = tumour_keyed
         .mix(normal_keyed)
         .groupTuple()
-        .filter { key, kinds, vcfs, panel_vcfs, panel_flags -> kinds.contains('T') }
+        .filter { key, kinds, vcfs, panel_vcfs, panel_flags -> kinds.contains('T') || kinds.contains('S') }
         .map { key, kinds, vcfs, panel_vcfs, panel_flags ->
-            def t = kinds.indexOf('T')
+            def t = kinds.findIndexOf { it == 'T' || it == 'S' }
             def n = kinds.indexOf('N')
-            def matched = use_matched && n >= 0 && panel_flags[n]
+            def matched = use_matched && kinds[t] == 'T' && n >= 0 && panel_flags[n]
             tuple(key[0], key[1], vcfs[t], panel_vcfs[t], panel_flags[t], matched ? vcfs[n] : no_vcf, matched)
         }
 

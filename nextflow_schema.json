@@ -162,6 +162,16 @@
         "normal_filters": {
           "type": "object",
           "description": "Per-caller bcftools expression that decides which normal records carry the SV, replacing the default genotype test. Example: {lumpy: 'FORMAT/SU[0]>=3'}. Set through a params file."
+        },
+        "delly_filter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use delly filter -f somatic on the DELLY BCF (sheet role bcf) instead of the split tumour VCF. DELLY's own filter tests the control, so the matched-normal subtraction is not applied to its calls."
+        },
+        "delly_filter_args": {
+          "type": "string",
+          "default": "",
+          "description": "Extra options for delly filter, for example '-a 0.1 -p'. Empty uses DELLY's defaults (minimum alt fraction 0.2, tumour coverage 10, no alt support in the control)."
         }
       }
     }
