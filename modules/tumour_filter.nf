@@ -4,7 +4,7 @@ process TUMOUR_FILTER {
 
     label 'utility'
 
-    publishDir "${params.publishDir}/filtered", mode: 'copy'
+    publishDir "${params.publishDir}", mode: 'copy'
 
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_2'
 
@@ -14,15 +14,17 @@ process TUMOUR_FILTER {
         val tool
 
     output:
-        tuple val(id), path("${id}_${tool}_filtered.vcf"), emit: filtered_vcf
+        tuple val(id), path("filtered/${id}/${id}_${tool}_filtered.vcf"), emit: filtered_vcf
 
     script:
     """
     set -euo pipefail
 
+    mkdir -p filtered/${id}
+
     tumour_valid_vcf="tumour_primary_valid.vcf"
     panel_valid_vcf="panel_primary_valid.vcf"
-    filtered_vcf="${id}_${tool}_filtered.vcf"
+    filtered_vcf="filtered/${id}/${id}_${tool}_filtered.vcf"
 
     sanitize_vcf() {
         local input_vcf="\$1"
