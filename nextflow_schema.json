@@ -172,6 +172,26 @@
           "type": "string",
           "default": "",
           "description": "Extra options for delly filter, for example '-a 0.1 -p'. Empty uses DELLY's defaults (minimum alt fraction 0.2, tumour coverage 10, no alt support in the control)."
+        },
+        "normal_filtered_callers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "gridss"
+          ],
+          "description": "Callers whose tumour calls are already filtered against the normal by the caller itself. They skip the cohort panel and the matched-normal subtraction. Set through a params file."
+        },
+        "matched_normal_by_id": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "lumpy"
+          ],
+          "description": "Callers whose tumour and normal VCFs come from one joint run and share record ids. The matched-normal subtraction matches them by id instead of interval overlap. Set through a params file."
         }
       }
     }

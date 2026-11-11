@@ -11,7 +11,7 @@ process TUMOUR_FILTER {
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_2'
 
     input:
-        tuple val(id), val(tool), path(vcf_file, stageAs: 'tumour_input.vcf'), path(normal_panel, stageAs: 'panel_input.vcf'), val(use_panel), path(matched_normal, stageAs: 'matched_normal_input.vcf'), val(use_matched)
+        tuple val(id), val(tool), path(vcf_file, stageAs: 'tumour_input.vcf'), path(normal_panel, stageAs: 'panel_input.vcf'), val(use_panel), path(matched_normal, stageAs: 'matched_normal_input.vcf'), val(use_matched), val(matched_by_id)
 
     output:
         tuple val(id), val(tool), path("filtered/${id}/${id}_${tool}_filtered.vcf"), emit: filtered_vcf
@@ -84,9 +84,21 @@ process TUMOUR_FILTER {
         awk '!/^#/' panel_primary_valid.vcf >> exclude_body.txt
     fi
 
+    : > matched_ids.txt
+
     if [ "${use_matched}" = "true" ]; then
         sanitize_vcf matched_normal_input.vcf matched_primary_valid.vcf
-        awk '!/^#/' matched_primary_valid.vcf >> exclude_body.txt
+        if [ "${matched_by_id}" = "true" ]; then
+            # Tumour and normal calls from one joint run share record ids, so the same site is matched by id
+            awk '!/^#/ && \$3 != "."  { print \$3 }' matched_primary_valid.vcf > matched_ids.txt
+        else
+            awk '!/^#/' matched_primary_valid.vcf >> exclude_body.txt
+        fi
+    fi
+
+    if [ -s matched_ids.txt ]; then
+        awk 'NR == FNR { ids[\$1] = 1; next } /^#/ || !(\$3 in ids)' matched_ids.txt "\${tumour_valid_vcf}" > tumour_after_ids.vcf
+        mv tumour_after_ids.vcf "\${tumour_valid_vcf}"
     fi
 
     # Rebuild the final VCF explicitly because bedtools subtract does not document header preservation.

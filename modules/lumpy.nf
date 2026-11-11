@@ -26,23 +26,36 @@ process LUMPY {
         --outdir ${lumpy_outdir} \
         -f "\$reference_fasta_abs" \
         -processes ${task.cpus} \
+        --genotype \
         --removepr \
         --support 3 \
         "${normal_bam}" \
         "${tumor_bam}"
 
-    # Get sample IDs from VCF header
+    # Get sample IDs from VCF header. With --genotype smoove writes the genotyped file.
     echo "Getting sample IDs from joint VCF"
-    lumpy_file="${lumpy_outdir}/${id}-smoove.vcf"
+    lumpy_file="${lumpy_outdir}/${id}-smoove.genotyped.vcf"
     gunzip -k \${lumpy_file}.gz
     sids=`vcfutils.pl listsam \$lumpy_file`
     normal_id=`echo \$sids | cut -f1 -d' '`
     tumor_id=`echo \$sids | cut -f2 -d' '`
 
-    # Split VCF into tumor and normal
+    # Split the joint VCF into tumor and normal, keeping the sites where that sample has an alt
+    # genotype (the same rule as bcftools view -c1 for DELLY and GRIDSS). The container's bcftools
+    # does not run, so the genotype is read with awk.
     echo "Splitting joint output VCF"
-    vcfutils.pl subsam \$lumpy_file \$normal_id > ${lumpy_outdir}/${id}_normal.vcf
-    vcfutils.pl subsam \$lumpy_file \$tumor_id > ${lumpy_outdir}/${id}_tumor.vcf
+    for pair in "normal:\$normal_id" "tumor:\$tumor_id"; do
+        role=\${pair%%:*}
+        sample=\${pair#*:}
+        vcfutils.pl subsam \$lumpy_file \$sample | awk 'BEGIN { FS = OFS = "\\t" }
+            /^#/ { print; next }
+            {
+                n = split(\$9, fmt, ":")
+                for (i = 1; i <= n; i++) if (fmt[i] == "GT") gt = i
+                split(\$10, val, ":")
+                if (val[gt] ~ /1/) print
+            }' > ${lumpy_outdir}/${id}_\${role}.vcf
+    done
     """
 
 }

@@ -19,10 +19,14 @@ workflow SV_COHORT {
     def no_vcf = file("${projectDir}/assets/NO_FILE")
     def min_support = params.panel_min_support as int
     def use_matched = params.matched_normal_subtract.toString().toBoolean()
+    // Callers whose tumour calls are already filtered against the normal skip the panel and the subtraction
+    def prefiltered = (params.normal_filtered_callers ?: []) as List
+    // Callers whose tumour and normal calls come from one joint run are matched by record id, not by interval overlap
+    def matched_by_id = (params.matched_normal_by_id ?: []) as List
 
     // kind T: a tumour VCF. kind S: already filtered against the normal by the caller's own somatic
     // filter, so the matched-normal subtraction is not applied to it.
-    plain_tumours = rows.filter { it[3] == 'tumor' }.map { id, nid, caller, role, vcf -> tuple(id, caller, vcf, 'T') }
+    plain_tumours = rows.filter { it[3] == 'tumor' }.map { id, nid, caller, role, vcf -> tuple(id, caller, vcf, prefiltered.contains(caller) ? 'S' : 'T') }
 
     DELLY_SOMATIC_PREP(rows.filter { it[3] == 'bcf' }.map { id, nid, caller, role, vcf -> tuple(id, vcf) })
     DELLY_FILTER(DELLY_SOMATIC_PREP.out.prepared)
@@ -41,6 +45,7 @@ workflow SV_COHORT {
     // One VCF per distinct normal and caller. A normal shared by several pairs is counted once,
     // using the VCF from the first of those pairs by id.
     distinct_normals = normals
+        .filter { id, nid, caller, vcf, usable -> !prefiltered.contains(caller) }
         .map { id, nid, caller, vcf, usable -> tuple([caller, nid], id, vcf) }
         .groupTuple()
         .map { key, ids, vcfs ->
@@ -80,7 +85,7 @@ workflow SV_COHORT {
             def t = kinds.findIndexOf { it == 'T' || it == 'S' }
             def n = kinds.indexOf('N')
             def matched = use_matched && kinds[t] == 'T' && n >= 0 && panel_flags[n]
-            tuple(key[0], key[1], vcfs[t], panel_vcfs[t], panel_flags[t], matched ? vcfs[n] : no_vcf, matched)
+            tuple(key[0], key[1], vcfs[t], panel_vcfs[t], panel_flags[t], matched ? vcfs[n] : no_vcf, matched, matched_by_id.contains(key[1]))
         }
 
     TUMOUR_FILTER(to_filter)

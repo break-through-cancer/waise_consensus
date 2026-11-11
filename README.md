@@ -72,7 +72,7 @@ Inputs must use the same reference build and contig names. Each caller's VCFs sh
 
 Each caller's panel keeps the SVs found in at least `--panel_min_support` distinct normals (default 2). The panel is merged with Jasmine from one VCF per distinct normal, so several tumors from one patient do not make that patient's normal calls look recurrent. With fewer distinct normals than the threshold the panel is empty.
 
-Normal records enter the panel and the subtraction only when the normal carries the SV (`--normal_alt_only true`). By default that means an alt genotype (`GT[0]`). Not every caller records it: the LUMPY and GRIDSS normal VCFs from this pipeline leave the genotype empty and list every site genotyped, so their normal VCFs cannot be filtered this way and would otherwise remove every tumor call. For such a VCF the file is used as it is in the panel, matched-normal subtraction is skipped for that caller, and the task log says so. To decide with the caller's own evidence instead, set `normal_filters` in a params file, for example:
+Normal records enter the panel and the subtraction only when the normal carries the SV (`--normal_alt_only true`). By default that means an alt genotype (`GT[0]`). The calling step runs `smoove call --genotype` for LUMPY and writes only the sites where each sample has an alt genotype, as it does for DELLY and GRIDSS, so the LUMPY normal VCF holds the SVs the normal carries. LUMPY VCFs from earlier runs have no genotype and list every site LUMPY genotyped, so subtracting them would remove every tumor call. For such a VCF the file is used as it is in the panel, matched-normal subtraction is skipped for that caller, and the task log says so. To decide with another measure, set `normal_filters` in a params file, for example:
 
 ```yaml
 normal_filters:
@@ -80,6 +80,11 @@ normal_filters:
 ```
 
 The expression is a `bcftools view -i` expression and cannot contain single quotes. Normal VCFs should hold a single sample.
+
+Two options adjust how callers take part:
+
+- `--normal_filtered_callers` (default `[gridss]`) lists callers whose tumor calls the caller itself already filtered against the normal. GRIDSS runs `gridss_somatic_filter` with a panel of normals, and neither the cohort panel nor the subtraction removed any GRIDSS record in testing. These callers skip both steps, and no panel is built for them, which avoids merging the large GRIDSS normal VCFs.
+- `--matched_normal_by_id` (default `[lumpy]`) lists callers whose tumor and normal VCFs come from one joint run and share record ids. For them the matched-normal subtraction removes the tumor record with the same id as an alt normal record, instead of removing every tumor record that overlaps a normal interval, which removed hundreds more.
 
 By default each pair's own normal calls are also subtracted from its tumor calls (`--matched_normal_subtract true`). Normal calls that enter this step come from the joint tumor-normal run for that pair.
 

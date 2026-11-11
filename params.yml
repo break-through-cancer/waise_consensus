@@ -26,6 +26,8 @@ csv: "test.csv"               # required: sample sheet. entry full/call: id, tum
 #   lumpy: 'FORMAT/SU[0]>=3'
 # delly_filter: true             # delly filter -f somatic on the DELLY BCF
 # delly_filter_args: ''          # extra options, e.g. '-a 0.1 -p'
+# normal_filtered_callers: [gridss]   # already normal-filtered by the caller; skip panel and subtraction
+# matched_normal_by_id: [lumpy]       # match the pair's own normal by record id instead of interval overlap
 # matched_normal_subtract: true  # also subtract each pair's own normal calls
 # panel_subtract_any_overlap: false
 
