@@ -8,5 +8,8 @@
   "run_lumpy": "$.dataset.params.run_lumpy",
   "run_svaba": "$.dataset.params.run_svaba",
   "run_delly": "$.dataset.params.run_delly",
-  "run_gridss": "$.dataset.params.run_gridss"
+  "run_gridss": "$.dataset.params.run_gridss",
+  "entry": "$.dataset.params.entry",
+  "panel_min_support": "$.dataset.params.panel_min_support",
+  "matched_normal_subtract": "$.dataset.params.matched_normal_subtract"
 }

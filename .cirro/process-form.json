@@ -13,6 +13,17 @@
           "other"
         ]
       },
+      "entry": {
+        "title": "Entry",
+        "description": "full: call SVs, then filter and merge. call: raw caller VCFs only. cohort: filter and merge existing caller VCFs from one or more datasets (no BAMs needed).",
+        "type": "string",
+        "default": "full",
+        "enum": [
+          "full",
+          "call",
+          "cohort"
+        ]
+      },
       "reference_fasta": {
         "title": "Reference Fasta",
         "description": "Required if genome_build == 'other', defaults available for hg38 and hg19",
@@ -64,6 +75,19 @@
       "run_gridss": {
         "title": "Run GRIDSS",
         "description": "Include GRIDSS in the consensus call. Turning this off also skips all GRIDSS reference/blacklist/PoN requirements above",
+        "type": "boolean",
+        "default": true
+      },
+      "panel_min_support": {
+        "title": "Normal Panel Support",
+        "description": "Number of distinct normals that must carry an SV for it to enter a caller's normal panel",
+        "type": "integer",
+        "default": 2,
+        "minimum": 1
+      },
+      "matched_normal_subtract": {
+        "title": "Subtract Matched Normal",
+        "description": "Also remove tumor calls that overlap the pair's own normal calls",
         "type": "boolean",
         "default": true
       }
