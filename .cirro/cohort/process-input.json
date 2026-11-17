@@ -1,0 +1,6 @@
+{
+  "publishDir": "$.params.dataset.s3|/data/",
+  "panel_min_support": "$.dataset.params.panel_min_support",
+  "delly_filter": "$.dataset.params.delly_filter",
+  "matched_normal_subtract": "$.dataset.params.matched_normal_subtract"
+}

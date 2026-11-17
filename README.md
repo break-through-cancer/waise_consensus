@@ -43,6 +43,18 @@ nasa3,t3.bam,t1.bam.bai,n3.bam,n1.bam.bai
 
 Calling is independent for each pair: a pair's caller output does not depend on which other pairs are in the run. The normal panel is the only step that looks across pairs, so it is the part that can be rerun on its own with `--entry cohort`.
 
+### Cirro Processes
+
+The repository holds three Cirro configurations, each in its own folder of Cirro files:
+
+| Folder | Process | Entry | Form |
+| --- | --- | --- | --- |
+| `.cirro/` | Combined | Chosen on the form (`full`, `call`, `cohort`) | All options |
+| `.cirro/call/` | SV calling | `call` (fixed) | Reference, GRIDSS files, caller selection |
+| `.cirro/cohort/` | SV cohort consensus | `cohort` (fixed) | Panel support, DELLY filter, matched-normal subtraction |
+
+The cohort process lists the calling process as its parent, so its input datasets are the calling outputs. Select any number of them: the preprocess step reads the published caller VCFs and builds the cohort sheet. `tests/test_cirro_preprocess.py` checks both preprocess scripts.
+
 The BAM sheet accepts an optional `normal_id` column naming the normal sample. It defaults to the normal BAM file name, so pairs that share a normal BAM share a normal.
 
 ## Cohort Stage

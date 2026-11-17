@@ -1,0 +1,76 @@
+{
+  "form": {
+    "type": "object",
+    "properties": {
+      "genome_build": {
+        "title": "Genome Build",
+        "description": "Genome Build",
+        "type": "string",
+        "default": "hg38",
+        "enum": [
+          "hg38",
+          "hg19",
+          "other"
+        ]
+      },
+      "reference_fasta": {
+        "title": "Reference Fasta",
+        "description": "Required if genome_build == 'other', defaults available for hg38 and hg19",
+        "type": "string",
+        "multiple": false,
+        "pathType": "reference",
+        "file": "**/genome_fasta_gatk/**/genome.fasta"
+      },
+      "gridss_blacklist": {
+        "title": "Blacklist Bed File",
+        "description": "Required if genome_build == 'other', defaults available for hg38 and hg19",
+        "type": "string",
+        "multiple": false,
+        "pathType": "reference",
+        "file": "**/genome_bed/**/regions.bed"
+      },
+      "gridss_properties": {
+        "title": "GRIDSS Property Files",
+        "description": "GRIDSS property files from their github. Can supply custom properties if desired",
+        "type": "string",
+        "multiple": false,
+        "pathType": "reference",
+        "file": "**/*"
+      },
+      "run_manta": {
+        "title": "Run Manta",
+        "description": "Include Manta in the calls",
+        "type": "boolean",
+        "default": true
+      },
+      "run_lumpy": {
+        "title": "Run LUMPY",
+        "description": "Include LUMPY (via smoove) in the calls",
+        "type": "boolean",
+        "default": true
+      },
+      "run_svaba": {
+        "title": "Run SvABA",
+        "description": "Include SvABA in the calls",
+        "type": "boolean",
+        "default": true
+      },
+      "run_delly": {
+        "title": "Run DELLY",
+        "description": "Include DELLY in the calls",
+        "type": "boolean",
+        "default": true
+      },
+      "run_gridss": {
+        "title": "Run GRIDSS",
+        "description": "Run GRIDSS. Turning this off also skips all GRIDSS reference/blacklist/PoN requirements above",
+        "type": "boolean",
+        "default": true
+      }
+    },
+    "required": [
+      "genome_build"
+    ]
+  },
+  "ui": {}
+}
