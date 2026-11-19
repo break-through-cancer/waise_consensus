@@ -117,6 +117,11 @@ else:
 
     # file type from path: BAM+BAI or CRAM+CRAI. The "bam"/"bai" labels name the alignment and
     # its index; the callers read both formats given the reference FASTA.
+    # Only alignments and their indexes: datasets from the alignment pipeline also hold other
+    # files per sample (recalibration tables, for example) that must not be taken for a BAM.
+    df = df[df["file"].str.contains(r"\.(?:bam|cram|bai|crai)$", regex=True)].copy()
+    if df.empty:
+        raise ValueError("No BAM or CRAM files with an index found in the input datasets")
     df["is_bai"] = df["file"].str.contains(r"\.(?:bai|crai)$", regex=True)
     df["filetype"] = df["is_bai"].map({True: "bai", False: "bam"})
 

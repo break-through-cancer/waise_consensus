@@ -62,8 +62,11 @@ class CallPreprocess(unittest.TestCase):
             "file": ["s3://b/T1.bam", "s3://b/T1.bam.bai", "s3://b/T2.cram", "s3://b/T2.cram.crai", "s3://b/N1.bam", "s3://b/N1.bam.bai"],
         }
         sheet = {"sample": ["T1", "T2", "N1"], "patient": ["P1", "P1", "P1"], "status": ["tumor", "tumor", "normal"]}
+        files["sample"] = ["T1", "N1"] + files["sample"]
+        files["file"] = ["s3://b/preprocessing/recal_table/T1/T1.table", "s3://b/preprocessing/recal_table/N1/N1.table"] + files["file"]
         rows, added = run_preprocess("call", files, sheet, {})
         self.assertEqual(added["entry"], "call")
+        self.assertTrue(all(r["normal_bam"].endswith(".bam") and r["tumor_bam"].endswith((".bam", ".cram")) for r in rows))
         self.assertEqual([r["id"] for r in rows], ["T1", "T2"])
         self.assertEqual({r["normal_id"] for r in rows}, {"P1"})
         self.assertEqual(rows[1]["tumor_bai"], "s3://b/T2.cram.crai")
