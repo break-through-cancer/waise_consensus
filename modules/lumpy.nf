@@ -4,7 +4,7 @@ process LUMPY {
 
     publishDir "${params.publishDir}", mode: 'copy'
     
-    container 'quay.io/biocontainers/smoove:0.2.8--h9ee0642_1'
+    container 'quay.io/biocontainers/smoove:0.2.8--h9ee0642_0'
 
     input:
         tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
@@ -41,8 +41,7 @@ process LUMPY {
     tumor_id=`echo \$sids | cut -f2 -d' '`
 
     # Split the joint VCF into tumor and normal, keeping the sites where that sample has an alt
-    # genotype (the same rule as bcftools view -c1 for DELLY and GRIDSS). The container's bcftools
-    # does not run, so the genotype is read with awk.
+    # genotype (the same rule as bcftools view -c1 for DELLY and GRIDSS), read here with awk.
     echo "Splitting joint output VCF"
     for pair in "normal:\$normal_id" "tumor:\$tumor_id"; do
         role=\${pair%%:*}
