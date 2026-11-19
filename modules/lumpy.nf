@@ -4,7 +4,7 @@ process LUMPY {
 
     publishDir "${params.publishDir}", mode: 'copy'
     
-    container 'quay.io/biocontainers/smoove:0.2.8--h9ee0642_0'
+    container 'quay.io/biocontainers/smoove:0.2.8--h9ee0642_1'
 
     input:
         tuple val(id), path(tumor_bam), path(tumor_bai), path(normal_bam), path(normal_bai)
@@ -20,6 +20,14 @@ process LUMPY {
     def reference_fasta = "${reference_dir}/reference.fa"
 
     """
+    # The image's bcftools links libopenblas.so.0, which is absent; the image's libblas.so.3 satisfies it.
+    # Smoove runs bcftools for --genotype. The 0.2.8--h9ee0642_0 build has the opposite fault (lumpy_filter
+    # needs libcrypto.so.1.0.0), so this build stays.
+    mkdir -p blas_shim
+    ln -s /usr/local/lib/libblas.so.3 blas_shim/libopenblas.so.0
+    export LD_LIBRARY_PATH="\$(pwd)/blas_shim"
+    bcftools --version | head -1
+
     reference_fasta_abs="\$(pwd)/${reference_fasta}"
     smoove call \
         --name ${id} \
